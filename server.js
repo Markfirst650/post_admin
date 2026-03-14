@@ -12,6 +12,20 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
+const SKIP_CI_MARKERS = ['[skip ci]', '[ci skip]', '[no ci]', '[skip actions]', '[actions skip]'];
+
+const ensureSkipCiMessage = (commitMessage, filePath) => {
+  const baseMessage = (commitMessage && commitMessage.trim()) ? commitMessage.trim() : `Update ${filePath}`;
+  const lowerMessage = baseMessage.toLowerCase();
+  const hasSkipMarker = SKIP_CI_MARKERS.some(marker => lowerMessage.includes(marker));
+
+  if (hasSkipMarker) {
+    return baseMessage;
+  }
+
+  return `${baseMessage} [skip ci]`;
+};
+
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 
@@ -240,7 +254,7 @@ const pushToGitHub = async ({ filePath, commitMessage, overwrite, markdown }) =>
   }
 
   const payload = {
-    message: commitMessage || `Update ${filePath}`,
+    message: ensureSkipCiMessage(commitMessage, filePath),
     content: Buffer.from(markdown).toString('base64'),
     branch,
     ...(sha && { sha })
@@ -272,7 +286,7 @@ const pushToGitee = async ({ filePath, commitMessage, overwrite, markdown }) => 
 
   const payload = {
     access_token: token,
-    message: commitMessage || `Update ${filePath}`,
+    message: ensureSkipCiMessage(commitMessage, filePath),
     content: Buffer.from(markdown).toString('base64'),
     branch,
     ...(sha && { sha })
