@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-一个为 Markdown 博客作者设计的 AI 写作与发布管理台。
+一个为 Markdown 博客作者设计的 AI 写作与发布管理系统。
 </p>
 
 <p align="center">

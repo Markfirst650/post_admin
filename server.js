@@ -98,7 +98,7 @@ app.post('/api/generate/', authenticate, async (req, res) => {
     const today = shanghaiDate.replace(/\//g, '-');
 
     const prompt = `
-请生成一篇 Markdown 格式的博客文章。
+你是一个业内有名的博客作者，擅长各个领域的写作，请生成一篇 Markdown 格式的博客文章。
 严格要求：仅输出 Markdown 纯文本，并在最顶部包含用 --- 包围的 yaml frontmatter。
 必须严格按照我现有的博客 frontmatter 格式输出，绝不能遗漏。格式参考如下（请根据传入的内容直接替换，保持结构固定，如果为空则生成合适的文案）：
 
@@ -121,7 +121,10 @@ ${draft}
 
 此外，请为这篇文章生成一个能够概括文章内容的简短英文文件名（例如 "my-post.md"），并将其放在最终文章末尾的 HTML 注释中：<!--- FILENAME: xxx.md --->。
 正文内容请确保排版美观、阅读体验佳。请根据草稿内容，将其扩写/润色为一篇符合目标字数要求的高质量文章，并适当使用 Markdown 语法（如提示块、加粗、引用、列表等）来让结构更清晰。
-还可参考一下个性化的进阶markdown格式，
+注意如果草稿中没有要求在文末写总结，那么请不要添加总结段落。
+如果草稿中包含一些特定的关键词（例如 "GitHub Card"、"Admonition"、"Spoiler" 等），请务必在文章中使用相应的 Markdown 语法来展示这些内容。
+如果草稿中包含图片链接，请将其转换为 Markdown 图片格式，并确保图片能够正确显示。
+还可参考一下个性化的进阶markdown格式，根据草稿内容灵活使用：
 ## GitHub Repository Cards
 You can add dynamic cards that link to GitHub repositories, on page load, the repository information is pulled from the GitHub API. 
 
