@@ -74,7 +74,7 @@
       
       <div class="text-center mb-8 mt-2">
         <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/80 shadow-inner mb-5 border border-white">
-          <svg class="w-10 h-10 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+          <svg class="w-10 h-10 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
         </div>
         <h2 class="text-2xl font-black text-gray-800 tracking-tight">授权访问</h2>
 
@@ -84,7 +84,7 @@
         <div class="relative">
           <input type="password" v-model="loginPassword" placeholder="输入访问密码..." @keyup.enter="handleLogin" class="w-full bg-white/60 border border-white/50 rounded-2xl py-4 px-5 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/50 transition-all duration-300 text-gray-800 tracking-widest font-mono text-lg shadow-inner placeholder-gray-400 placeholder:tracking-normal placeholder:font-sans">
         </div>
-        <button @click="handleLogin" :disabled="loading.auth" class="w-full bg-gradient-to-r from-indigo-500/90 to-purple-600/90 backdrop-blur-md text-white font-bold py-4 rounded-2xl hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50 shadow-xl border border-white/20 transition-all duration-300 flex items-center justify-center text-lg gap-2">
+        <button @click="handleLogin" :disabled="loading.auth" class="w-full bg-gray-900/90 backdrop-blur-md text-white font-bold py-4 rounded-2xl hover:bg-black disabled:opacity-50 shadow-xl border border-white/20 transition-all duration-300 flex items-center justify-center text-lg gap-2">
           <span v-if="loading.auth">
             <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
           </span>
@@ -152,10 +152,10 @@
           <textarea v-model="form.draft" class="w-full flex-grow bg-white/60 border border-white/50 rounded-xl py-3 px-4 resize-none focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/50 transition-all duration-300 text-gray-800 placeholder-gray-500" placeholder="在此输入草稿、指令或核心要点..."></textarea>
         </div>
 
-        <button @click="handleGenerate" :disabled="loading.generate" class="mt-4 shrink-0 w-full bg-gradient-to-r from-indigo-500/90 to-purple-600/90 backdrop-blur-md text-white font-bold py-3 rounded-xl hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50 flex items-center justify-center shadow-lg border border-white/20 transition-all duration-300">
-          <span v-if="loading.generate">
-            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
-            AI 正在生成中，请耐心等待...
+        <button @click="handleGenerate" :disabled="loading.generate" class="mt-4 shrink-0 w-full bg-[#00aeec] backdrop-blur-md text-white font-bold py-3 rounded-xl hover:bg-[#0098ce] disabled:opacity-50 flex items-center justify-center shadow-lg border border-white/20 transition-all duration-300">
+          <span v-if="loading.generate" class="inline-flex items-center justify-center gap-3">
+            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+            <span>AI 正在生成中，请耐心等待...</span>
           </span>
           <span v-else>智能生成 Markdown</span>
         </button>
@@ -189,20 +189,20 @@
             </div>
             <div class="flex items-center col-span-2 space-x-6 mt-2 pt-2 border-t border-gray-300/30">
               <label class="flex items-center space-x-2 text-sm font-medium text-gray-700 cursor-pointer">
-                <input type="checkbox" v-model="form.syncToGitee" class="w-4 h-4 rounded border-gray-300 text-emerald-500 focus:ring-emerald-500 bg-white/50">
+                <input type="checkbox" v-model="form.syncToGitee" class="w-4 h-4 rounded border-gray-300 text-gray-800 focus:ring-gray-800 bg-white/50">
                 <span>同步推送至 Gitee</span>
               </label>
               <label class="flex items-center space-x-2 text-sm font-medium text-gray-700 cursor-pointer">
-                <input type="checkbox" v-model="form.overwrite" class="w-4 h-4 rounded border-gray-300 text-emerald-500 focus:ring-emerald-500 bg-white/50">
+                <input type="checkbox" v-model="form.overwrite" class="w-4 h-4 rounded border-gray-300 text-gray-800 focus:ring-gray-800 bg-white/50">
                 <span>覆盖已有同名文件</span>
               </label>
             </div>
           </div>
 
-          <button @click="handlePublish" :disabled="loading.publish" class="w-full bg-gradient-to-r from-emerald-500/90 to-teal-600/90 backdrop-blur-md text-white font-bold py-3 rounded-xl hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 flex items-center justify-center shadow-lg border border-white/20 transition-all duration-300">
-            <span v-if="loading.publish">
-              <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
-              发布推送到仓库中...
+          <button @click="handlePublish" :disabled="loading.publish" class="w-full bg-[#fb7299] backdrop-blur-md text-white font-bold py-3 rounded-xl hover:bg-[#fc4d7d] disabled:opacity-50 flex items-center justify-center shadow-lg border border-white/20 transition-all duration-300">
+            <span v-if="loading.publish" class="inline-flex items-center justify-center gap-3">
+              <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+              <span>发布推送到仓库中...</span>
             </span>
             <span v-else>推送到代码仓库 (GitHub {{ form.syncToGitee ? ' & Gitee' : '' }})</span>
           </button>

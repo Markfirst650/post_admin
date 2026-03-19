@@ -124,7 +124,14 @@ ${draft}
 注意如果草稿中没有要求在文末写总结，那么请不要添加总结段落。
 如果草稿中包含一些特定的关键词（例如 "GitHub Card"、"Admonition"、"Spoiler" 等），请务必在文章中使用相应的 Markdown 语法来展示这些内容。
 如果草稿中包含图片链接，请将其转换为 Markdown 图片格式，并确保图片能够正确显示。
-还可参考一下个性化的进阶markdown格式，根据草稿内容灵活使用：
+还支持mermaid图表的生成，如果草稿中包含流程、关系等描述，请使用mermaid语法生成相应的图表。支持图标的类型如下：
+- 流程图（flowchart）
+- 时序图（sequenceDiagram）
+- 甘特图（gantt）
+- 类图（classDiagram）
+- 状态图（stateDiagram）
+- 饼图（pie）
+还可参考一下个性化的进阶markdown格式，注意仅作为语法格式的参考，不能作为文章内容，根据草稿内容灵活使用：
 ## GitHub Repository Cards
 You can add dynamic cards that link to GitHub repositories, on page load, the repository information is pulled from the GitHub API. 
 
