@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>博客内容生成与发布管理系统</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>post_admin</title>
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
@@ -13,367 +13,592 @@
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   <style>
-    /* basic markdown preview styling */
-    .prose h1, .prose h2, .prose h3 { font-weight: bold; margin-bottom: 0.5rem; }
-    .prose p { margin-bottom: 1rem; }
-    .prose code { background: #e2e8f0; padding: 2px 4px; border-radius: 4px; }
-    .prose .katex-display { overflow-x: auto; }
-    
-    /* 自定义背景图样式 */
+    :root {
+      color-scheme: light;
+      --bg: #f5efe6;
+      --ink: #1e2430;
+      --panel: rgba(255, 251, 245, 0.82);
+      --panel-border: rgba(78, 61, 46, 0.12);
+      --accent: #0f766e;
+      --accent-2: #9a3412;
+    }
+
     body {
-      /* 将下面的 URL 替换为你想要的背景图地址 */
-      background-image: url('https://cdn-r2.solmount.top/image/2026/03/14/69b510950342b.jpg');
-      background-size: cover;
-      background-position: center;
-      background-attachment: fixed;
-      background-repeat: no-repeat;
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.16), transparent 30%),
+        radial-gradient(circle at top right, rgba(154, 52, 18, 0.18), transparent 25%),
+        linear-gradient(135deg, #f8f4ec 0%, #f2e8db 45%, #ebe2d6 100%);
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    .glass {
+      background: var(--panel);
+      backdrop-filter: blur(18px);
+      border: 1px solid var(--panel-border);
+      box-shadow: 0 20px 60px rgba(31, 41, 55, 0.12);
+    }
+
+    .prose-preview h1,
+    .prose-preview h2,
+    .prose-preview h3 {
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      margin-top: 1.5rem;
+    }
+
+    .prose-preview p,
+    .prose-preview ul,
+    .prose-preview ol,
+    .prose-preview blockquote,
+    .prose-preview pre {
+      margin-bottom: 1rem;
+    }
+
+    .prose-preview code {
+      background: rgba(15, 23, 42, 0.08);
+      border-radius: 6px;
+      padding: 0.15rem 0.35rem;
+    }
+
+    .prose-preview pre {
+      background: #172033;
+      color: #f8fafc;
+      border-radius: 14px;
+      padding: 1rem;
+      overflow-x: auto;
+    }
+
+    .prose-preview blockquote {
+      border-left: 4px solid rgba(15, 118, 110, 0.35);
+      padding-left: 1rem;
+      color: #334155;
+    }
+
+    .prose-preview .katex-display {
+      overflow-x: auto;
     }
   </style>
 </head>
-<body class="text-gray-900 font-sans antialiased">
-<div id="app" class="min-h-screen flex flex-col relative bg-black/10">
-  
-  <!-- StatusBar -->
-  <div v-if="status" :class="['fixed top-0 left-0 w-full z-50 p-3 text-center text-white text-sm font-medium', statusType === 'error' ? 'bg-red-500' : (statusType === 'success' ? 'bg-green-500' : 'bg-blue-500')]">
-    {{ status }}
-    <button class="absolute top-2 right-4 text-white" @click="status = ''">✕</button>
-  </div>
-
-  <!-- Fullscreen Preview Modal -->
-  <div v-if="previewMode" class="fixed inset-0 z-[100] bg-white flex flex-col w-full h-full shadow-2xl">
-    <div class="flex items-center justify-between p-4 border-b bg-gray-100 shadow-sm shrink-0">
-      <h2 class="text-lg font-bold text-gray-800">Markdown 沉浸式双栏预览</h2>
-      <button @click="previewMode = false" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-md focus:outline-none font-medium">退出全屏预览</button>
-    </div>
-    <div class="flex-grow flex flex-row w-full h-[calc(100vh-70px)] overflow-hidden">
-      <!-- Left: Editor -->
-      <div class="w-1/2 h-full border-r border-gray-300">
-        <textarea id="editor-panel" v-model="form.markdown" class="w-full h-full p-6 resize-none focus:outline-none font-mono text-sm leading-relaxed bg-gray-50/50" placeholder="在此编辑 Markdown..."></textarea>
-      </div>
-      <!-- Right: Preview -->
-      <div id="preview-panel" class="w-1/2 h-full p-6 overflow-y-auto bg-white prose max-w-none" v-html="renderedMarkdown"></div>
-    </div>
-  </div>
-
-  <header class="bg-white/60 backdrop-blur-xl shadow-sm border-b border-white/40 shrink-0 sticky top-0 z-40">
-    <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-      <h1 class="text-2xl font-black text-gray-800 tracking-tight drop-shadow-sm flex items-center gap-3">
-        </span>
-        博客内容生成与发布管理系统
-      </h1>
-      <button v-if="isLoggedIn" @click="handleLogout" class="text-sm font-bold bg-white/50 hover:bg-red-500 hover:text-white text-red-600 border border-red-200/50 hover:border-red-500 px-5 py-2 rounded-xl transition-all duration-300 shadow-sm flex items-center gap-1.5">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-        安全退出
-      </button>
-    </div>
-  </header>
-
-  <main class="flex-grow flex items-center justify-center p-4">
-    <!-- Login Panel -->
-    <div v-if="!isLoggedIn" class="bg-white/70 backdrop-blur-xl p-10 rounded-[2rem] shadow-2xl max-w-md w-full border border-white/50 relative overflow-hidden">
-      
-      <div class="text-center mb-8 mt-2">
-        <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/80 shadow-inner mb-5 border border-white">
-          <svg class="w-10 h-10 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-        </div>
-        <h2 class="text-2xl font-black text-gray-800 tracking-tight">授权访问</h2>
-
-      </div>
-
-      <div class="space-y-6">
-        <div class="relative">
-          <input type="password" v-model="loginPassword" placeholder="输入访问密码..." @keyup.enter="handleLogin" class="w-full bg-white/60 border border-white/50 rounded-2xl py-4 px-5 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/50 transition-all duration-300 text-gray-800 tracking-widest font-mono text-lg shadow-inner placeholder-gray-400 placeholder:tracking-normal placeholder:font-sans">
-        </div>
-        <button @click="handleLogin" :disabled="loading.auth" class="w-full bg-gray-900/90 backdrop-blur-md text-white font-bold py-4 rounded-2xl hover:bg-black disabled:opacity-50 shadow-xl border border-white/20 transition-all duration-300 flex items-center justify-center text-lg gap-2">
-          <span v-if="loading.auth">
-            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
-          </span>
-          {{ loading.auth ? '正在验证身份...' : '进入发布页' }}
-        </button>
+<body>
+  <div id="app" class="min-h-screen">
+    <div
+      v-if="status.message"
+      :class="[
+        'fixed left-1/2 top-4 z-50 w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl px-4 py-3 text-sm font-medium shadow-lg',
+        status.type === 'error' ? 'bg-rose-600 text-white' : '',
+        status.type === 'success' ? 'bg-emerald-600 text-white' : '',
+        status.type === 'info' ? 'bg-slate-900 text-white' : ''
+      ]"
+    >
+      <div class="flex items-center justify-between gap-4">
+        <span>{{ status.message }}</span>
+        <button class="rounded-full px-2 py-1 text-white/80 hover:text-white" @click="clearStatus">关闭</button>
       </div>
     </div>
 
-    <!-- Admin Panel -->
-    <div v-else class="max-w-7xl w-full grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch min-h-[750px] pb-10 mt-6">
-      
-      <!-- Left Column: Generate Meta -->
-      <div class="bg-white/70 backdrop-blur-xl p-8 rounded-2xl shadow-xl flex flex-col space-y-5 border border-white/40">
-        <h2 class="text-xl font-bold text-gray-800 mb-2 border-b border-gray-400/30 pb-3 shrink-0">一、内容生成与配置</h2>
-        
-        <div class="grid grid-cols-2 gap-5">
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1.5">模型渠道 (Provider)</label>
-            <select v-model="form.provider" class="w-full bg-white/60 border border-white/50 rounded-xl py-2 px-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/50 transition-all duration-300 text-gray-800">
-              <option value="deepseek">DeepSeek</option>
-              <option value="openai">OpenAI</option>
-              <option value="minimax">MiniMax</option>
-              <option value="glm">GLM</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1.5">模型名称 (Model)</label>
-            <input type="text" v-model="form.model" class="w-full bg-white/60 border border-white/50 rounded-xl py-2 px-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/50 transition-all duration-300 text-gray-800 placeholder-gray-500" placeholder="deepseek-chat">
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-5">
-          <div class="col-span-2 md:col-span-1">
-            <label class="block text-sm font-semibold text-gray-700 mb-1.5">文章标题 *</label>
-            <input type="text" v-model="form.title" class="w-full bg-white/60 border border-white/50 rounded-xl py-2 px-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/50 transition-all duration-300 text-gray-800">
-          </div>
-          <div class="col-span-2 md:col-span-1">
-            <label class="block text-sm font-semibold text-gray-700 mb-1.5">文章封面链接</label>
-            <input type="text" v-model="form.image" class="w-full bg-white/60 border border-white/50 rounded-xl py-2 px-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/50 transition-all duration-300 text-gray-800 placeholder-gray-500" placeholder="https://...">
-          </div>
-        </div>
-
-        <div class="grid grid-cols-3 gap-5">
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1.5">分类 (Category)</label>
-            <input type="text" v-model="form.category" class="w-full bg-white/60 border border-white/50 rounded-xl py-2 px-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/50 transition-all duration-300 text-gray-800">
-          </div>
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1.5">标签 (Tags)</label>
-            <input type="text" v-model="form.tags" class="w-full bg-white/60 border border-white/50 rounded-xl py-2 px-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/50 transition-all duration-300 text-gray-800">
-          </div>
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1.5">关键词 (Keywords)</label>
-            <input type="text" v-model="form.keywords" class="w-full bg-white/60 border border-white/50 rounded-xl py-2 px-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/50 transition-all duration-300 text-gray-800">
-          </div>
-        </div>
-
+    <header class="border-b border-black/5 bg-white/55 backdrop-blur-xl">
+      <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
         <div>
-           <label class="block text-sm font-semibold text-gray-700 mb-1.5">目标篇幅字数</label>
-           <input type="text" v-model="form.targetLength" class="w-full bg-white/60 border border-white/50 rounded-xl py-2 px-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/50 transition-all duration-300 text-gray-800 placeholder-gray-500" placeholder="1200-1800">
+          <p class="text-xs font-semibold uppercase tracking-[0.32em] text-slate-500">post_admin</p>
+          <h1 class="mt-1 text-2xl font-black tracking-tight text-slate-900">AI 写作与发布后台</h1>
         </div>
-
-        <div class="flex-grow flex flex-col min-h-[180px]">
-          <label class="block text-sm font-semibold text-gray-700 mb-1.5">输入草稿 / 核心指令</label>
-          <textarea v-model="form.draft" class="w-full flex-grow bg-white/60 border border-white/50 rounded-xl py-3 px-4 resize-none focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/50 transition-all duration-300 text-gray-800 placeholder-gray-500" placeholder="在此输入草稿、指令或核心要点..."></textarea>
-        </div>
-
-        <button @click="handleGenerate" :disabled="loading.generate" class="mt-4 shrink-0 w-full bg-[#00aeec] backdrop-blur-md text-white font-bold py-3 rounded-xl hover:bg-[#0098ce] disabled:opacity-50 flex items-center justify-center shadow-lg border border-white/20 transition-all duration-300">
-          <span v-if="loading.generate" class="inline-flex items-center justify-center gap-3">
-            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
-            <span>AI 正在生成中，请耐心等待...</span>
-          </span>
-          <span v-else>智能生成 Markdown</span>
-        </button>
-      </div>
-
-      <!-- Right Column: Result, Edit & Publish -->
-      <div class="bg-white/70 backdrop-blur-xl p-8 rounded-2xl shadow-xl flex flex-col border border-white/40">
-        <h2 class="text-xl font-bold text-gray-800 mb-4 border-b border-gray-400/30 pb-3 flex justify-between items-center shrink-0">
-          二、生成结果与发布
-          <button @click="previewMode = true" class="text-sm bg-white/60 hover:bg-white/90 backdrop-blur-sm border border-white/50 px-4 py-1.5 rounded-lg text-indigo-700 font-bold transition-all shadow-sm">
-            全屏实时预览
+        <div class="flex items-center gap-3">
+          <button
+            v-if="isLoggedIn"
+            @click="handleLogout"
+            class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+          >
+            退出登录
           </button>
-        </h2>
-
-        <div class="flex-grow overflow-hidden flex flex-col space-y-5">
-          
-          <div class="flex-grow overflow-hidden relative border border-white/50 rounded-xl bg-white/50 backdrop-blur-sm shadow-inner transition-colors duration-300 focus-within:bg-white/80">
-            <textarea v-model="form.markdown" class="w-full h-full p-5 resize-none bg-transparent focus:outline-none text-gray-800 font-mono text-sm leading-relaxed" placeholder="等待生成 Markdown 或在此处直接编写..."></textarea>
-          </div>
-          
-          <!-- Publish Settings -->
-          <div class="grid grid-cols-2 gap-3 bg-white/40 backdrop-blur-md p-5 rounded-xl border border-white/50 shadow-sm">
-            <div>
-              <label class="block text-sm font-semibold text-gray-700 mb-1.5">文件路径 (src/content/posts/...)</label>
-              <input type="text" v-model="form.filePath" class="w-full bg-white/60 border border-white/50 rounded-lg py-2 px-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 transition-all duration-300 text-gray-800 placeholder-gray-500" placeholder="post-title.md">
-            </div>
-            <div>
-              <label class="block text-sm font-semibold text-gray-700 mb-1.5">提交信息 (Commit Msg)</label>
-              <input type="text" v-model="form.commitMessage" class="w-full bg-white/60 border border-white/50 rounded-lg py-2 px-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400/50 transition-all duration-300 text-gray-800 placeholder-gray-500" placeholder="Update post">
-              <p class="mt-1 text-xs text-gray-600">发布时会自动附加 [skip ci]，仅推送内容，不触发 GitHub Actions 工作流。</p>
-            </div>
-            <div class="flex items-center col-span-2 space-x-6 mt-2 pt-2 border-t border-gray-300/30">
-              <label class="flex items-center space-x-2 text-sm font-medium text-gray-700 cursor-pointer">
-                <input type="checkbox" v-model="form.syncToGitee" class="w-4 h-4 rounded border-gray-300 text-gray-800 focus:ring-gray-800 bg-white/50">
-                <span>同步推送至 Gitee</span>
-              </label>
-              <label class="flex items-center space-x-2 text-sm font-medium text-gray-700 cursor-pointer">
-                <input type="checkbox" v-model="form.overwrite" class="w-4 h-4 rounded border-gray-300 text-gray-800 focus:ring-gray-800 bg-white/50">
-                <span>覆盖已有同名文件</span>
-              </label>
-            </div>
-          </div>
-
-          <button @click="handlePublish" :disabled="loading.publish" class="w-full bg-[#fb7299] backdrop-blur-md text-white font-bold py-3 rounded-xl hover:bg-[#fc4d7d] disabled:opacity-50 flex items-center justify-center shadow-lg border border-white/20 transition-all duration-300">
-            <span v-if="loading.publish" class="inline-flex items-center justify-center gap-3">
-              <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
-              <span>发布推送到仓库中...</span>
-            </span>
-            <span v-else>推送到代码仓库 (GitHub {{ form.syncToGitee ? ' & Gitee' : '' }})</span>
-          </button>
-
         </div>
       </div>
+    </header>
 
+    <main :class="isLoggedIn ? 'mx-auto flex min-h-[calc(100vh-81px)] max-w-7xl flex-col px-4 py-6 sm:px-6 lg:px-8' : 'mx-auto flex min-h-[calc(100vh-81px)] max-w-7xl items-center justify-center px-4 py-6 sm:px-6 lg:px-8'">
+      <section v-if="!isLoggedIn" class="mx-auto w-full max-w-md">
+        <div class="glass rounded-[2rem] p-8 sm:p-10">
+          <p class="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">Sign In</p>
+          <h2 class="mt-3 text-3xl font-black text-slate-900">进入发布后台</h2>
+          <p class="mt-3 text-sm leading-6 text-slate-600">
+            当前版本默认启用更严格的 cookie、限流和服务端校验。适合放在 HTTPS 和反向代理之后公开访问。
+          </p>
+
+          <div class="mt-8 space-y-4">
+            <label class="block">
+              <span class="mb-2 block text-sm font-semibold text-slate-700">管理员密码</span>
+              <input
+                v-model="loginPassword"
+                type="password"
+                class="w-full rounded-2xl border border-slate-300 bg-white/75 px-4 py-4 text-base text-slate-900 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200"
+                placeholder="输入 ADMIN_PASSWORD"
+                @keyup.enter="handleLogin"
+              >
+            </label>
+            <button
+              @click="handleLogin"
+              :disabled="loading.auth"
+              class="w-full rounded-2xl bg-teal-700 px-4 py-4 text-base font-bold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {{ loading.auth ? '正在验证...' : '登录' }}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section v-else class="grid flex-1 grid-cols-1 gap-5 xl:grid-cols-2 xl:items-stretch">
+        <div class="glass flex h-full flex-col rounded-[2rem] p-5 sm:p-6">
+          <div class="mb-4 flex items-center justify-between">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Generate</p>
+              <h2 class="mt-1 text-2xl font-black text-slate-900">生成配置</h2>
+            </div>
+          </div>
+
+          <div class="flex flex-1 flex-col gap-2.5">
+          <div class="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+            <label class="block">
+              <span class="mb-1.5 block text-sm font-semibold text-slate-700">Provider</span>
+              <select v-model="form.provider" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200">
+                <option value="deepseek">DeepSeek</option>
+                <option value="openai">OpenAI</option>
+                <option value="minimax">MiniMax</option>
+                <option value="glm">GLM</option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="mb-1.5 block text-sm font-semibold text-slate-700">Model</span>
+              <input v-model="form.model" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200" placeholder="留空则使用默认模型">
+            </label>
+            <label class="block md:col-span-2">
+              <span class="mb-1.5 block text-sm font-semibold text-slate-700">标题</span>
+              <input v-model="form.title" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200" placeholder="AI 助力的 Markdown 内容生成与发布工具">
+            </label>
+            <label class="block">
+              <span class="mb-1.5 block text-sm font-semibold text-slate-700">封面图</span>
+              <input v-model="form.image" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200" placeholder="https://example.com/cover.png">
+            </label>
+            <label class="block">
+              <span class="mb-1.5 block text-sm font-semibold text-slate-700">分类</span>
+              <input v-model="form.category" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200">
+            </label>
+            <label class="block">
+              <span class="mb-1.5 block text-sm font-semibold text-slate-700">标签</span>
+              <input v-model="form.tags" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200" placeholder="ai, markdown, publishing">
+            </label>
+            <label class="block">
+              <span class="mb-1.5 block text-sm font-semibold text-slate-700">关键词 / 描述线索</span>
+              <input v-model="form.keywords" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200">
+            </label>
+            <label class="block">
+              <span class="mb-1.5 block text-sm font-semibold text-slate-700">目标长度</span>
+              <input v-model="form.targetLength" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200" placeholder="1200-1800 words">
+            </label>
+          </div>
+          <label class="flex flex-1 flex-col">
+            <span class="mb-1.5 block text-sm font-semibold text-slate-700">草稿 / 写作指令</span>
+            <textarea v-model="form.draft" class="h-0 min-h-[100px] flex-1 w-full resize-none rounded-2xl border border-slate-300 bg-white/80 px-4 py-3 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200" placeholder="写清核心观点、结构要求、是否需要 Mermaid / 引用 / 示例。"></textarea>
+          </label>
+          </div>
+
+          <button
+            @click="handleGenerate"
+            :disabled="loading.generate"
+            class="mt-4 w-full rounded-2xl bg-slate-900 px-4 py-4 text-base font-bold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {{ loading.generate ? '正在生成...' : '生成 Markdown' }}
+          </button>
+        </div>
+
+        <div class="glass flex h-full flex-col rounded-[2rem] p-6 sm:p-8">
+          <div class="mb-5 flex items-center justify-between gap-4">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Review & Publish</p>
+              <h2 class="mt-2 text-2xl font-black text-slate-900">编辑与发布</h2>
+            </div>
+            <button
+              @click="previewMode = true"
+              class="rounded-xl border border-slate-300 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-500 hover:bg-white"
+            >
+              全屏预览
+            </button>
+          </div>
+
+          <div class="flex flex-1 flex-col">
+          <label class="flex flex-1 flex-col">
+            <span class="mb-2 block text-sm font-semibold text-slate-700">Markdown 内容</span>
+            <textarea v-model="form.markdown" class="h-0 min-h-[160px] flex-1 w-full resize-none rounded-2xl border border-slate-300 bg-white/80 px-4 py-4 font-mono text-sm leading-6 text-slate-900 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200" placeholder="生成结果会出现在这里，你也可以手动编辑。"></textarea>
+          </label>
+
+          <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <label class="block">
+              <span class="mb-2 block text-sm font-semibold text-slate-700">文件路径</span>
+              <input v-model="form.filePath" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-3 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200" placeholder="nested/post-name.md">
+
+            </label>
+            <label class="block">
+              <span class="mb-2 block text-sm font-semibold text-slate-700">提交信息</span>
+              <input v-model="form.commitMessage" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-3 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200" placeholder="Add new article">
+              
+            </label>
+          </div>
+
+          <div class="mt-4 flex flex-wrap items-center gap-5 rounded-2xl border border-slate-200 bg-white/55 px-4 py-4">
+            <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+              <input v-model="form.syncToGitee" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
+              <span>同步到 Gitee</span>
+            </label>
+            <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+              <input v-model="form.overwrite" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
+              <span>覆盖同名文件</span>
+            </label>
+          </div>
+          </div>
+
+          <button
+            @click="handlePublish"
+            :disabled="loading.publish"
+            class="mt-5 w-full rounded-2xl bg-teal-700 px-4 py-4 text-base font-bold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {{ loading.publish ? '正在发布...' : '发布到内容仓库' }}
+          </button>
+
+        </div>
+      </section>
+    </main>
+
+    <div v-if="previewMode" class="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-sm">
+      <div class="mx-auto flex h-full max-w-7xl flex-col px-4 py-4 sm:px-6 lg:px-8">
+        <div class="glass flex h-full flex-col rounded-[2rem]">
+          <div class="flex items-center justify-between border-b border-black/5 px-6 py-4">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Preview</p>
+              <h3 class="mt-1 text-xl font-black text-slate-900">沉浸式双栏预览</h3>
+            </div>
+            <button
+              @click="closePreview"
+              class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+            >
+              关闭
+            </button>
+          </div>
+
+          <div class="grid min-h-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-2">
+            <textarea
+              id="preview-editor"
+              v-model="form.markdown"
+              class="min-h-[260px] w-full resize-none border-r border-black/5 bg-white/70 px-6 py-6 font-mono text-sm leading-6 text-slate-900 outline-none"
+            ></textarea>
+            <div id="preview-panel" class="prose-preview overflow-y-auto bg-white px-6 py-6 text-sm leading-7 text-slate-800" v-html="renderedMarkdown"></div>
+          </div>
+        </div>
+      </div>
     </div>
-  </main>
-</div>
+  </div>
 
-<script>
-  const { createApp, ref, computed, onMounted, watch, nextTick } = Vue;
+  <script>
+    const { createApp, computed, nextTick, onMounted, onBeforeUnmount, ref, watch } = Vue;
 
-  createApp({
-    setup() {
-      const isLoggedIn = ref(false);
-      const loading = ref({ auth: false, generate: false, publish: false });
-      const status = ref('');
-      const statusType = ref('info'); // info, success, error
-      const previewMode = ref(false);
-
-      const loginPassword = ref('');
-      const form = ref({
-        provider: 'deepseek',
-        model: 'deepseek-chat',
-        title: '',
-        image: '',
-        category: '',
-        tags: '',
-        keywords: '',
-        draft: '',
-        targetLength: '1200-1800',
-        markdown: '',
-        filePath: '',
-        commitMessage: '',
-        syncToGitee: true,
-        overwrite: false,
-      });
-
-      const showMessage = (msg, type = 'info') => {
-        status.value = msg;
-        statusType.value = type;
-        if(type !== 'error') {
-          setTimeout(() => { if (status.value === msg) status.value = ''; }, 5000);
-        }
-      };
-
-      const handleLogin = async () => {
-        if(!loginPassword.value) return showMessage('请输入密码', 'error');
-        loading.value.auth = true;
-        try {
-          await axios.post('/api/login/', { password: loginPassword.value });
-          isLoggedIn.value = true;
-          showMessage('登录成功', 'success');
-          // Reload properly to ensure clean state
-          window.location.reload();
-        } catch (e) {
-          showMessage(e.response?.data?.error || '登录失败', 'error');
-        } finally {
-          loading.value.auth = false;
-        }
-      };
-
-      const handleLogout = async () => {
-        await axios.post('/api/logout/');
-        window.location.reload();
-      };
-
-      const checkAuth = async () => {
-        try { 
-          const { data } = await axios.get('/api/check-auth/');
-          isLoggedIn.value = data.authenticated;
-        } catch (e) {}
-      };
-
-      const handleGenerate = async () => {
-        if(!form.value.title) return showMessage('标题为必填项', 'error');
-        loading.value.generate = true;
-        showMessage('请求生成中，请耐心等待大模型返回结果...', 'info');
-        
-        try {
-          const { data } = await axios.post('/api/generate/', { ...form.value });
-          form.value.markdown = data.markdown;
-          if(data.suggestedFilePath && !form.value.filePath) {
-            form.value.filePath = data.suggestedFilePath;
-          }
-          showMessage('生成成功！请检查并可在下方调整', 'success');
-        } catch (e) {
-          showMessage('生成失败: ' + (e.response?.data?.error || e.message), 'error');
-        } finally {
-          loading.value.generate = false;
-        }
-      };
-
-      const handlePublish = async () => {
-        if(!form.value.filePath) return showMessage('提交失败，请填写文件路径', 'error');
-        loading.value.publish = true;
-        showMessage('正在推送到仓库中...', 'info');
-
-        try {
-           const { data } = await axios.post('/api/publish/', { ...form.value });
-           showMessage(`发布成功！GitHub链接: ${data.urls.github} ${data.urls.gitee ? (' | Gitee链接: ' + data.urls.gitee) : ''}`, 'success');
-        } catch (e) {
-           showMessage('发布失败: ' + (e.response?.data?.error || e.message), 'error');
-        } finally {
-           loading.value.publish = false;
-        }
-      };
-
-      const renderedMarkdown = computed(() => marked.parse(form.value.markdown || ''));
-
-      const katexOptions = {
-        delimiters: [
-          { left: '$$', right: '$$', display: true },
-          { left: '$', right: '$', display: false },
-          { left: '\\(', right: '\\)', display: false },
-          { left: '\\[', right: '\\]', display: true }
-        ],
-        throwOnError: false
-      };
-
-      // 每次 markdown 内容变化时，等 DOM 更新后重新渲染公式
-      watch(() => form.value.markdown, () => {
-        nextTick(() => {
-          const el = document.getElementById('preview-panel');
-          if (el && window.renderMathInElement) renderMathInElement(el, katexOptions);
-        });
-      });
-
-      // 打开预览弹窗时：初始化公式渲染 + 绑定左右同步滚动
-      watch(previewMode, async (val) => {
-        if (!val) return;
-        await nextTick();
-        const editor = document.getElementById('editor-panel');
-        const preview = document.getElementById('preview-panel');
-        if (!editor || !preview) return;
-
-        if (window.renderMathInElement) renderMathInElement(preview, katexOptions);
-
-        let isSyncing = false;
-        editor.addEventListener('scroll', () => {
-          if (isSyncing) return;
-          isSyncing = true;
-          const scrollable = editor.scrollHeight - editor.clientHeight;
-          const ratio = scrollable > 0 ? editor.scrollTop / scrollable : 0;
-          preview.scrollTop = ratio * (preview.scrollHeight - preview.clientHeight);
-          requestAnimationFrame(() => { isSyncing = false; });
-        });
-        preview.addEventListener('scroll', () => {
-          if (isSyncing) return;
-          isSyncing = true;
-          const scrollable = preview.scrollHeight - preview.clientHeight;
-          const ratio = scrollable > 0 ? preview.scrollTop / scrollable : 0;
-          editor.scrollTop = ratio * (editor.scrollHeight - editor.clientHeight);
-          requestAnimationFrame(() => { isSyncing = false; });
-        });
-      });
-
-      onMounted(() => {
-        checkAuth();
-      });
-
-      return {
-        isLoggedIn, loading, status, statusType, previewMode,
-        loginPassword, form, 
-        handleLogin, handleLogout, handleGenerate, handlePublish,
-        renderedMarkdown
-      };
+    function escapeHtml(raw) {
+      return String(raw || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
-  }).mount('#app');
-</script>
+
+    marked.setOptions({
+      gfm: true,
+      breaks: true,
+      headerIds: false,
+      mangle: false,
+    });
+
+    createApp({
+      setup() {
+        const isLoggedIn = ref(false);
+        const previewMode = ref(false);
+        const loginPassword = ref('');
+        const loading = ref({ auth: false, generate: false, publish: false });
+        const status = ref({ message: '', type: 'info' });
+        const providerDefaults = ref({});
+        const form = ref({
+          provider: 'deepseek',
+          model: '',
+          title: '',
+          image: '',
+          category: '',
+          tags: '',
+          keywords: '',
+          draft: '',
+          targetLength: '1200-1800 words',
+          markdown: '',
+          filePath: '',
+          commitMessage: '',
+          syncToGitee: true,
+          overwrite: false,
+        });
+
+        let statusTimer = null;
+        let detachPreviewSync = null;
+
+        const katexOptions = {
+          delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '$', right: '$', display: false },
+            { left: '\\(', right: '\\)', display: false },
+            { left: '\\[', right: '\\]', display: true },
+          ],
+          throwOnError: false,
+        };
+
+        const renderedMarkdown = computed(() => {
+          const safeMarkdown = escapeHtml(form.value.markdown);
+          return marked.parse(safeMarkdown);
+        });
+
+        function clearStatus() {
+          status.value = { message: '', type: 'info' };
+          if (statusTimer) {
+            clearTimeout(statusTimer);
+            statusTimer = null;
+          }
+        }
+
+        function showStatus(message, type = 'info', persist = false, durationMs = 5000) {
+          clearStatus();
+          status.value = { message, type };
+          if (!persist && type !== 'error') {
+            statusTimer = setTimeout(() => {
+              clearStatus();
+            }, durationMs);
+          }
+        }
+
+        async function renderMath() {
+          await nextTick();
+          if (!window.renderMathInElement) {
+            return;
+          }
+
+          const targets = ['preview-panel'];
+          targets.forEach((id) => {
+            const element = document.getElementById(id);
+            if (element) {
+              window.renderMathInElement(element, katexOptions);
+            }
+          });
+        }
+
+        function attachPreviewSync() {
+          const editor = document.getElementById('preview-editor');
+          const preview = document.getElementById('preview-panel');
+          if (!editor || !preview) {
+            detachPreviewSync = null;
+            return;
+          }
+
+          let syncing = false;
+
+          const syncScroll = (from, to) => {
+            if (syncing) {
+              return;
+            }
+
+            syncing = true;
+            const fromRange = from.scrollHeight - from.clientHeight;
+            const toRange = to.scrollHeight - to.clientHeight;
+            const ratio = fromRange > 0 ? from.scrollTop / fromRange : 0;
+            to.scrollTop = ratio * Math.max(toRange, 0);
+            requestAnimationFrame(() => {
+              syncing = false;
+            });
+          };
+
+          const handleEditorScroll = () => syncScroll(editor, preview);
+          const handlePreviewScroll = () => syncScroll(preview, editor);
+
+          editor.addEventListener('scroll', handleEditorScroll);
+          preview.addEventListener('scroll', handlePreviewScroll);
+
+          detachPreviewSync = () => {
+            editor.removeEventListener('scroll', handleEditorScroll);
+            preview.removeEventListener('scroll', handlePreviewScroll);
+            detachPreviewSync = null;
+          };
+        }
+
+        function closePreview() {
+          previewMode.value = false;
+          if (detachPreviewSync) {
+            detachPreviewSync();
+          }
+        }
+
+        function applyProviderDefault(provider, force = false) {
+          const defaultModel = providerDefaults.value?.[provider]?.model || '';
+          if (!defaultModel) {
+            return;
+          }
+
+          if (force || !form.value.model.trim()) {
+            form.value.model = defaultModel;
+          }
+        }
+
+        async function checkAuth() {
+          try {
+            const { data } = await axios.get('/api/check-auth/');
+            isLoggedIn.value = Boolean(data.authenticated);
+          } catch (error) {
+            showStatus('鉴权状态检查失败，请刷新后重试。', 'error', true);
+          }
+        }
+
+        async function loadPublicConfig() {
+          try {
+            const { data } = await axios.get('/api/public-config/');
+            providerDefaults.value = data.providers || {};
+            applyProviderDefault(form.value.provider, true);
+          } catch (error) {
+            showStatus('默认模型配置加载失败。', 'error', true);
+          }
+        }
+
+        async function handleLogin() {
+          if (!loginPassword.value) {
+            showStatus('请输入管理员密码。', 'error', true);
+            return;
+          }
+
+          loading.value.auth = true;
+          try {
+            await axios.post('/api/login/', { password: loginPassword.value });
+            loginPassword.value = '';
+            isLoggedIn.value = true;
+            showStatus('登录成功。', 'success');
+          } catch (error) {
+            showStatus(error.response?.data?.error || '登录失败。', 'error', true);
+          } finally {
+            loading.value.auth = false;
+          }
+        }
+
+        async function handleLogout() {
+          try {
+            await axios.post('/api/logout/');
+            isLoggedIn.value = false;
+            showStatus('已退出登录。', 'success');
+          } catch (error) {
+            showStatus(error.response?.data?.error || '退出登录失败。', 'error', true);
+          }
+        }
+
+        async function handleGenerate() {
+          if (!form.value.title.trim()) {
+            showStatus('标题不能为空。', 'error', true);
+            return;
+          }
+
+          if (!form.value.draft.trim()) {
+            showStatus('草稿或写作指令不能为空。', 'error', true);
+            return;
+          }
+
+          loading.value.generate = true;
+          showStatus('正在请求模型生成内容...', 'info');
+          try {
+            const { data } = await axios.post('/api/generate/', { ...form.value });
+            form.value.markdown = data.markdown || '';
+            if (data.suggestedFilePath && !form.value.filePath) {
+              form.value.filePath = data.suggestedFilePath;
+            }
+            showStatus('生成完成，请复核后发布。', 'success');
+          } catch (error) {
+            showStatus(error.response?.data?.error || '生成失败。', 'error', true);
+          } finally {
+            loading.value.generate = false;
+          }
+        }
+
+        async function handlePublish() {
+          if (!form.value.filePath.trim()) {
+            showStatus('发布前必须填写文件路径。', 'error', true);
+            return;
+          }
+
+          if (!form.value.markdown.trim()) {
+            showStatus('发布内容不能为空。', 'error', true);
+            return;
+          }
+
+          loading.value.publish = true;
+          showStatus('正在发布到仓库...', 'info');
+          try {
+            const { data } = await axios.post('/api/publish/', { ...form.value });
+            const links = [data.urls?.github, data.urls?.gitee].filter(Boolean).join(' | ');
+            showStatus(`发布成功。${links ? ` ${links}` : ''}`, 'success', false, links ? 8000 : 5000);
+          } catch (error) {
+            showStatus(error.response?.data?.error || '发布失败。', 'error', true);
+          } finally {
+            loading.value.publish = false;
+          }
+        }
+
+        watch(() => form.value.markdown, () => {
+          renderMath();
+        });
+
+        watch(() => form.value.provider, (provider) => {
+          applyProviderDefault(provider, true);
+        });
+
+        watch(previewMode, async (enabled) => {
+          if (enabled) {
+            await renderMath();
+            attachPreviewSync();
+            return;
+          }
+
+          if (detachPreviewSync) {
+            detachPreviewSync();
+          }
+        });
+
+        onMounted(async () => {
+          await loadPublicConfig();
+          await checkAuth();
+          await renderMath();
+        });
+
+        onBeforeUnmount(() => {
+          clearStatus();
+          if (detachPreviewSync) {
+            detachPreviewSync();
+          }
+        });
+
+        return {
+          isLoggedIn,
+          previewMode,
+          loginPassword,
+          loading,
+          status,
+          providerDefaults,
+          form,
+          renderedMarkdown,
+          clearStatus,
+          closePreview,
+          handleLogin,
+          handleLogout,
+          handleGenerate,
+          handlePublish,
+        };
+      },
+    }).mount('#app');
+  </script>
 </body>
 </html>

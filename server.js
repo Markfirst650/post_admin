@@ -1,4 +1,5 @@
 require('dotenv').config();
+
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
@@ -7,322 +8,597 @@ const axios = require('axios');
 const path = require('path');
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
 
 const SKIP_CI_MARKERS = ['[skip ci]', '[ci skip]', '[no ci]', '[skip actions]', '[actions skip]'];
-
-const ensureSkipCiMessage = (commitMessage, filePath) => {
-  const baseMessage = (commitMessage && commitMessage.trim()) ? commitMessage.trim() : `Update ${filePath}`;
-  const lowerMessage = baseMessage.toLowerCase();
-  const hasSkipMarker = SKIP_CI_MARKERS.some(marker => lowerMessage.includes(marker));
-
-  if (hasSkipMarker) {
-    return baseMessage;
-  }
-
-  return `${baseMessage} [skip ci]`;
+const PROVIDERS = {
+  deepseek: {
+    apiKeyEnv: 'DEEPSEEK_API_KEY',
+    baseUrlEnv: 'DEEPSEEK_BASE_URL',
+    modelEnv: 'DEEPSEEK_MODEL',
+    defaultBaseURL: 'https://api.deepseek.com',
+    defaultModel: 'deepseek-chat',
+  },
+  glm: {
+    apiKeyEnv: 'GLM_API_KEY',
+    baseUrlEnv: 'GLM_BASE_URL',
+    modelEnv: 'GLM_MODEL',
+    defaultModel: 'glm-4.5',
+  },
+  minimax: {
+    apiKeyEnv: 'MINIMAX_API_KEY',
+    baseUrlEnv: 'MINIMAX_BASE_URL',
+    modelEnv: 'MINIMAX_MODEL',
+    defaultModel: 'MiniMax-Text-01',
+  },
+  openai: {
+    apiKeyEnv: 'OPENAI_API_KEY',
+    baseUrlEnv: 'OPENAI_BASE_URL',
+    modelEnv: 'OPENAI_MODEL',
+    defaultModel: 'gpt-4.1-mini',
+  },
 };
 
-const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
+const PORT = parseInteger(process.env.PORT, 3000);
+const JWT_SECRET = process.env.JWT_SECRET;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const COOKIE_SECURE = process.env.COOKIE_SECURE
+  ? process.env.COOKIE_SECURE === 'true'
+  : NODE_ENV === 'production';
+const TRUST_PROXY = process.env.TRUST_PROXY === 'true';
+const CONTENT_ROOT = normalizeContentRoot(process.env.CONTENT_ROOT || 'src/content/posts');
+const LOGIN_WINDOW_MS = parseInteger(process.env.LOGIN_WINDOW_MS, 15 * 60 * 1000);
+const LOGIN_MAX_ATTEMPTS = parseInteger(process.env.LOGIN_MAX_ATTEMPTS, 10);
+const API_TIMEOUT_MS = parseInteger(process.env.API_TIMEOUT_MS, 30000);
 
-// Middleware for authentication
-const authenticate = (req, res, next) => {
-  const token = req.cookies.token;
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-  try {
-    jwt.verify(token, JWT_SECRET);
+const loginAttempts = new Map();
+
+validateStartupConfig();
+
+if (TRUST_PROXY) {
+  app.set('trust proxy', 1);
+}
+
+app.disable('x-powered-by');
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(cookieParser());
+app.use(securityHeaders);
+app.use(express.static(path.join(__dirname, 'public')));
+
+function parseInteger(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeContentRoot(root) {
+  return root.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+}
+
+function validateStartupConfig() {
+  const missing = [];
+
+  if (!ADMIN_PASSWORD || ADMIN_PASSWORD.length < 12) {
+    missing.push('ADMIN_PASSWORD (minimum 12 characters)');
+  }
+
+  if (!JWT_SECRET || JWT_SECRET.length < 32) {
+    missing.push('JWT_SECRET (minimum 32 characters)');
+  }
+
+  if (!process.env.GITHUB_OWNER) {
+    missing.push('GITHUB_OWNER');
+  }
+
+  if (!process.env.GITHUB_REPO) {
+    missing.push('GITHUB_REPO');
+  }
+
+  if (!process.env.GITHUB_TOKEN) {
+    missing.push('GITHUB_TOKEN');
+  }
+
+  if (missing.length) {
+    throw new Error(`Startup configuration invalid: ${missing.join(', ')}`);
+  }
+}
+
+function securityHeaders(req, res, next) {
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com https://cdn.jsdelivr.net https://cdn.jsdelivr.net/npm",
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.jsdelivr.net/npm",
+    "font-src 'self' https://cdn.jsdelivr.net https://cdn.jsdelivr.net/npm data:",
+    "img-src 'self' data: https:",
+    "connect-src 'self'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "object-src 'none'",
+  ].join('; ');
+
+  res.setHeader('Content-Security-Policy', csp);
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+}
+
+function getClientIp(req) {
+  const forwardedFor = req.headers['x-forwarded-for'];
+  if (typeof forwardedFor === 'string' && forwardedFor.length) {
+    return forwardedFor.split(',')[0].trim();
+  }
+
+  return req.ip || req.socket.remoteAddress || 'unknown';
+}
+
+function createLoginRateLimiter() {
+  return (req, res, next) => {
+    const key = getClientIp(req);
+    const now = Date.now();
+    const record = loginAttempts.get(key);
+
+    if (!record || now > record.resetAt) {
+      loginAttempts.set(key, { count: 0, resetAt: now + LOGIN_WINDOW_MS });
+      return next();
+    }
+
+    if (record.count >= LOGIN_MAX_ATTEMPTS) {
+      const retryAfterSeconds = Math.ceil((record.resetAt - now) / 1000);
+      res.setHeader('Retry-After', String(retryAfterSeconds));
+      return res.status(429).json({
+        error: `Too many login attempts. Try again in ${retryAfterSeconds} seconds.`,
+      });
+    }
+
     next();
-  } catch (err) {
+  };
+}
+
+function recordFailedLogin(req) {
+  const key = getClientIp(req);
+  const now = Date.now();
+  const record = loginAttempts.get(key);
+
+  if (!record || now > record.resetAt) {
+    loginAttempts.set(key, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
+    return;
+  }
+
+  record.count += 1;
+}
+
+function clearLoginAttempts(req) {
+  loginAttempts.delete(getClientIp(req));
+}
+
+function authenticate(req, res, next) {
+  const token = req.cookies.token;
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.user = payload;
+    next();
+  } catch (error) {
     res.status(403).json({ error: 'Invalid token' });
   }
-};
+}
 
-// --- AUTH API ---
-app.post('/api/login/', (req, res) => {
-  const { password } = req.body;
-  if (password === process.env.ADMIN_PASSWORD) {
-    const token = jwt.sign({ admin: true }, JWT_SECRET, { expiresIn: '1d' });
-    res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict' });
-    res.json({ success: true });
-  } else {
-    res.status(401).json({ error: 'Invalid password' });
-  }
-});
+function badRequest(message) {
+  const error = new Error(message);
+  error.statusCode = 400;
+  return error;
+}
 
-app.post('/api/logout/', (req, res) => {
-  res.clearCookie('token');
-  res.json({ success: true });
-});
+function conflict(message) {
+  const error = new Error(message);
+  error.statusCode = 409;
+  return error;
+}
 
-app.get('/api/check-auth/', (req, res) => {
-  const token = req.cookies.token;
-  if (!token) return res.json({ authenticated: false });
-  try {
-    jwt.verify(token, JWT_SECRET);
-    res.json({ authenticated: true });
-  } catch (err) {
-    res.json({ authenticated: false });
-  }
-});
-
-// --- GENERATE API ---
-app.post('/api/generate/', authenticate, async (req, res) => {
-  const { provider, model, title, image, category, tags, keywords, draft, targetLength } = req.body;
-  
-  let apiKey, baseURL;
-  if (provider === 'deepseek') {
-    apiKey = process.env.DEEPSEEK_API_KEY;
-    baseURL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
-  } else if (provider === 'glm') {
-    apiKey = process.env.GLM_API_KEY; // Using Zhipu or equivalent
-    baseURL = process.env.GLM_BASE_URL;
-  } else if (provider === 'minimax') {
-    apiKey = process.env.MINIMAX_API_KEY;
-    baseURL = process.env.MINIMAX_BASE_URL;
-  } else {
-    // Default to openai keys fallback
-    apiKey = process.env.OPENAI_API_KEY;
-    baseURL = process.env.OPENAI_BASE_URL;
+function validateRequiredString(value, fieldName, maxLength = 200) {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw badRequest(`${fieldName} is required.`);
   }
 
-  try {
-    const openai = new OpenAI({ apiKey, baseURL });
-    
-    // Explicitly format date with zero-padding (YYYY-MM-DD)
-    const now = new Date();
-    const shanghaiDate = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
-    const today = shanghaiDate.replace(/\//g, '-');
+  const normalized = value.trim();
+  if (normalized.length > maxLength) {
+    throw badRequest(`${fieldName} must be at most ${maxLength} characters.`);
+  }
 
-    const prompt = `
-你是一个业内有名的博客作者，擅长各个领域的写作，请生成一篇 Markdown 格式的博客文章。
-严格要求：仅输出 Markdown 纯文本，并在最顶部包含用 --- 包围的 yaml frontmatter。
-必须严格按照我现有的博客 frontmatter 格式输出，绝不能遗漏。格式参考如下（请根据传入的内容直接替换，保持结构固定，如果为空则生成合适的文案）：
+  return normalized;
+}
 
+function validateOptionalString(value, fieldName, maxLength = 500) {
+  if (value == null || value === '') {
+    return '';
+  }
+
+  if (typeof value !== 'string') {
+    throw badRequest(`${fieldName} must be a string.`);
+  }
+
+  const normalized = value.trim();
+  if (normalized.length > maxLength) {
+    throw badRequest(`${fieldName} must be at most ${maxLength} characters.`);
+  }
+
+  return normalized;
+}
+
+function validateMarkdown(markdown) {
+  const normalized = validateRequiredString(markdown, 'markdown', 200000);
+  if (!normalized.includes('---')) {
+    return normalized;
+  }
+
+  return normalized;
+}
+
+function resolveProvider(providerName, requestedModel) {
+  const providerKey = providerName && PROVIDERS[providerName] ? providerName : 'openai';
+  const provider = PROVIDERS[providerKey];
+  const apiKey = process.env[provider.apiKeyEnv];
+  const baseURL = process.env[provider.baseUrlEnv] || provider.defaultBaseURL;
+
+  if (!apiKey) {
+    throw badRequest(`Missing API key for provider "${providerKey}".`);
+  }
+
+  return {
+    providerKey,
+    apiKey,
+    baseURL,
+    model: requestedModel || process.env[provider.modelEnv] || provider.defaultModel,
+  };
+}
+
+function getPublicProviderDefaults() {
+  return Object.fromEntries(
+    Object.entries(PROVIDERS).map(([key, provider]) => [
+      key,
+      {
+        model: process.env[provider.modelEnv] || provider.defaultModel,
+        hasApiKey: Boolean(process.env[provider.apiKeyEnv]),
+      },
+    ])
+  );
+}
+
+function buildPrompt({ title, image, category, tags, keywords, draft, targetLength, today }) {
+  const description = keywords || 'Generate a concise description based on the article content.';
+  const normalizedTags = tags || 'blog, ai';
+  const normalizedCategory = category || 'General';
+
+  return `You are an experienced blog author.
+
+Write a production-ready Markdown article that matches the language of the user input.
+Return Markdown only. Do not wrap the result in a code fence.
+
+The document must start with YAML frontmatter in exactly this shape:
 ---
 title: ${title}
 published: ${today}
 updated: ${today}
-description: '${keywords || '在这里根据草稿生成一句简短的描述（description）摘要'}'
-image: '${image || ''}'
-tags: [${tags || '草稿相关标签'}]
-category: '${category || '默认分类'}'
-draft: false 
+description: '${description}'
+image: '${image}'
+tags: [${normalizedTags}]
+category: '${normalizedCategory}'
+draft: false
 ---
 
-文章正文生成要求：
-目标字数: ${targetLength}
+Requirements:
+- Respect the requested length: ${targetLength}.
+- Keep the article structured and readable with headings, lists, quotes, and callouts when useful.
+- If the draft asks for Mermaid diagrams, output valid Mermaid blocks.
+- If the draft includes image URLs, convert them to Markdown image syntax.
+- Do not add a generic conclusion unless the draft asks for one.
+- End the document with an HTML comment in this exact format:
+<!--- FILENAME: english-kebab-case-file-name.md --->
 
-草稿/指令/核心内容参考：
-${draft}
+Draft and instructions:
+${draft}`;
+}
 
-此外，请为这篇文章生成一个能够概括文章内容的简短英文文件名（例如 "my-post.md"），并将其放在最终文章末尾的 HTML 注释中：<!--- FILENAME: xxx.md --->。
-正文内容请确保排版美观、阅读体验佳。请根据草稿内容，将其扩写/润色为一篇符合目标字数要求的高质量文章，并适当使用 Markdown 语法（如提示块、加粗、引用、列表等）来让结构更清晰。
-注意如果草稿中没有要求在文末写总结，那么请不要添加总结段落。
-如果草稿中包含一些特定的关键词（例如 "GitHub Card"、"Admonition"、"Spoiler" 等），请务必在文章中使用相应的 Markdown 语法来展示这些内容。
-如果草稿中包含图片链接，请将其转换为 Markdown 图片格式，并确保图片能够正确显示。
-还支持mermaid图表的生成，如果草稿中包含流程、关系等描述，请使用mermaid语法生成相应的图表。支持图标的类型如下：
-- 流程图（flowchart）
-- 时序图（sequenceDiagram）
-- 甘特图（gantt）
-- 类图（classDiagram）
-- 状态图（stateDiagram）
-- 饼图（pie）
-还可参考一下个性化的进阶markdown格式，注意仅作为语法格式的参考，不能作为文章内容，根据草稿内容灵活使用：
-## GitHub Repository Cards
-You can add dynamic cards that link to GitHub repositories, on page load, the repository information is pulled from the GitHub API. 
+function getTodayInShanghai() {
+  const now = new Date();
+  const shanghaiDate = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
 
-::github{repo="matsuzaka-yuki/Mizuki"}
+  return shanghaiDate.replace(/\//g, '-');
+}
 
-Create a GitHub repository card with the code \`::github{repo="matsuzaka-yuki/Mizuki"}\`.
+function extractFilename(output) {
+  const match = output.match(/<!---\s*FILENAME:\s*(.*?)\s*--->/i);
+  const fallback = 'new-post.md';
 
-\`\`\`markdown
-::github{repo="matsuzaka-yuki/Mizuki"}
-\`\`\`
-
-## Admonitions
-
-Following types of admonitions are supported: \`note\` \`tip\` \`important\` \`warning\` \`caution\`
-
-:::note
-Highlights information that users should take into account, even when skimming.
-:::
-
-:::tip
-Optional information to help a user be more successful.
-:::
-
-:::important
-Crucial information necessary for users to succeed.
-:::
-
-:::warning
-Critical content demanding immediate user attention due to potential risks.
-:::
-
-:::caution
-Negative potential consequences of an action.
-:::
-
-### Basic Syntax
-
-\`\`\`markdown
-:::note
-Highlights information that users should take into account, even when skimming.
-:::
-
-:::tip
-Optional information to help a user be more successful.
-:::
-\`\`\`
-
-### Custom Titles
-
-The title of the admonition can be customized.
-
-:::note[MY CUSTOM TITLE]
-This is a note with a custom title.
-:::
-
-\`\`\`markdown
-:::note[MY CUSTOM TITLE]
-This is a note with a custom title.
-:::
-\`\`\`
-
-### GitHub Syntax
-
-> [!TIP]
-> [The GitHub syntax](https://github.com/orgs/community/discussions/16925) is also supported.
-
-\`\`\`markdown
-> [!NOTE]
-> The GitHub syntax is also supported.
-
-> [!TIP]
-> The GitHub syntax is also supported.
-\`\`\`
-
-### Spoiler
-
-You can add spoilers to your text. The text also supports **Markdown** syntax.
-
-The content :spoiler[is hidden **ayyy**]!
-
-\`\`\`markdown
-The content :spoiler[is hidden **ayyy**]!
-\`\`\`
-`;
-
-    const response = await openai.chat.completions.create({
-      model: model || process.env.OPENAI_MODEL || 'deepseek-chat',
-      messages: [{ role: 'user', content: prompt }]
-    });
-
-    const output = response.choices[0].message.content;
-    const filenameMatch = output.match(/<!---\s*FILENAME:\s*(.*?)\s*--->/);
-    let suggestedFilePath = 'new-post.md';
-    if (filenameMatch) {
-      suggestedFilePath = filenameMatch[1].trim();
-    }
-    
-    // Clean up output to remove the filename marker
-    const finalMarkdown = output.replace(/<!---\s*FILENAME:\s*(.*?)\s*--->/g, '').trim();
-
-    res.json({ markdown: finalMarkdown, suggestedFilePath });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  if (!match) {
+    return { finalMarkdown: output.trim(), suggestedFilePath: fallback };
   }
-});
 
-// --- PUBLISH API ---
-const pushToGitHub = async ({ filePath, commitMessage, overwrite, markdown }) => {
+  const candidate = match[1].trim().replace(/\\/g, '/');
+  const safeCandidate = candidate
+    .replace(/[^a-zA-Z0-9/_\-.]/g, '-')
+    .replace(/\/{2,}/g, '/')
+    .replace(/^-+|-+$/g, '');
+
+  return {
+    finalMarkdown: output.replace(/<!---\s*FILENAME:\s*(.*?)\s*--->/gi, '').trim(),
+    suggestedFilePath: safeCandidate || fallback,
+  };
+}
+
+function normalizePublishPath(filePath) {
+  const normalized = validateRequiredString(filePath, 'filePath', 180).replace(/\\/g, '/');
+  const resolved = path.posix.normalize(normalized);
+
+  if (resolved.startsWith('/') || resolved.startsWith('../') || resolved.includes('/../')) {
+    throw badRequest('filePath must stay inside the configured content directory.');
+  }
+
+  if (!/^[a-zA-Z0-9/_\-.]+$/.test(resolved)) {
+    throw badRequest('filePath contains unsupported characters.');
+  }
+
+  if (!resolved.endsWith('.md') && !resolved.endsWith('.mdx')) {
+    throw badRequest('filePath must end with .md or .mdx.');
+  }
+
+  return resolved;
+}
+
+function ensureSkipCiMessage(commitMessage, filePath) {
+  const baseMessage = commitMessage ? commitMessage.trim() : `Update ${filePath}`;
+  const finalMessage = baseMessage || `Update ${filePath}`;
+  const lowerMessage = finalMessage.toLowerCase();
+  const hasSkipMarker = SKIP_CI_MARKERS.some(marker => lowerMessage.includes(marker));
+
+  return hasSkipMarker ? finalMessage : `${finalMessage} [skip ci]`;
+}
+
+function createGitHubHeaders(token) {
+  return {
+    Authorization: `token ${token}`,
+    Accept: 'application/vnd.github.v3+json',
+    'User-Agent': 'post_admin',
+  };
+}
+
+async function pushToGitHub({ filePath, commitMessage, overwrite, markdown }) {
   const owner = process.env.GITHUB_OWNER;
   const repo = process.env.GITHUB_REPO;
   const branch = process.env.GITHUB_BRANCH || 'main';
   const token = process.env.GITHUB_TOKEN;
-  const fullPath = `src/content/posts/${filePath}`;
+  const fullPath = `${CONTENT_ROOT}/${filePath}`;
   const url = `https://api.github.com/repos/${owner}/${repo}/contents/${fullPath}`;
-
-  const headers = {
-    'Authorization': `token ${token}`,
-    'Accept': 'application/vnd.github.v3+json'
-  };
+  const headers = createGitHubHeaders(token);
 
   let sha;
   try {
-    const { data } = await axios.get(url, { headers, params: { ref: branch } });
+    const { data } = await axios.get(url, {
+      headers,
+      params: { ref: branch },
+      timeout: API_TIMEOUT_MS,
+    });
     sha = data.sha;
-    if (!overwrite) throw new Error('File already exists on GitHub and overwrite is false.');
-  } catch (err) {
-    if (err.response && err.response.status !== 404) {
-      throw err;
+    if (!overwrite) {
+      throw conflict('File already exists on GitHub. Enable overwrite to replace it.');
+    }
+  } catch (error) {
+    if (error.statusCode) {
+      throw error;
+    }
+
+    if (error.response && error.response.status !== 404) {
+      throw error;
     }
   }
 
   const payload = {
     message: ensureSkipCiMessage(commitMessage, filePath),
-    content: Buffer.from(markdown).toString('base64'),
+    content: Buffer.from(markdown, 'utf8').toString('base64'),
     branch,
-    ...(sha && { sha })
+    ...(sha ? { sha } : {}),
   };
 
-  const { data } = await axios.put(url, payload, { headers });
+  const { data } = await axios.put(url, payload, { headers, timeout: API_TIMEOUT_MS });
   return data.content.html_url;
-};
+}
 
-const pushToGitee = async ({ filePath, commitMessage, overwrite, markdown }) => {
+async function pushToGitee({ filePath, commitMessage, overwrite, markdown }) {
   const owner = process.env.GITEE_OWNER;
   const repo = process.env.GITEE_REPO;
   const branch = process.env.GITEE_BRANCH || 'master';
   const token = process.env.GITEE_TOKEN;
-  const fullPath = `src/content/posts/${filePath}`;
+
+  if (!owner || !repo || !token) {
+    throw badRequest('Gitee sync is enabled, but GITEE_OWNER, GITEE_REPO, or GITEE_TOKEN is missing.');
+  }
+
+  const fullPath = `${CONTENT_ROOT}/${filePath}`;
   const url = `https://gitee.com/api/v5/repos/${owner}/${repo}/contents/${fullPath}`;
 
   let sha;
   try {
-    // Check if exists
-    const { data } = await axios.get(url, { params: { access_token: token, ref: branch } });
+    const { data } = await axios.get(url, {
+      params: { access_token: token, ref: branch },
+      timeout: API_TIMEOUT_MS,
+    });
     sha = data.sha;
-    if (!overwrite) throw new Error('File already exists on Gitee and overwrite is false.');
-  } catch (err) {
-    if (err.response && err.response.status !== 404) {
-      throw err;
+    if (!overwrite) {
+      throw conflict('File already exists on Gitee. Enable overwrite to replace it.');
+    }
+  } catch (error) {
+    if (error.statusCode) {
+      throw error;
+    }
+
+    if (error.response && error.response.status !== 404) {
+      throw error;
     }
   }
 
   const payload = {
     access_token: token,
     message: ensureSkipCiMessage(commitMessage, filePath),
-    content: Buffer.from(markdown).toString('base64'),
+    content: Buffer.from(markdown, 'utf8').toString('base64'),
     branch,
-    ...(sha && { sha })
+    ...(sha ? { sha } : {}),
   };
 
   const method = sha ? 'put' : 'post';
-  const { data } = await axios({ method, url, data: payload });
-  // Gitee API difference parsing, URL might not be returned perfectly
+  await axios({ method, url, data: payload, timeout: API_TIMEOUT_MS });
   return `https://gitee.com/${owner}/${repo}/blob/${branch}/${fullPath}`;
-};
+}
 
-app.post('/api/publish/', authenticate, async (req, res) => {
-  const { filePath, commitMessage, overwrite, syncToGitee, markdown } = req.body;
+function logAudit(event, details = {}) {
+  const timestamp = new Date().toISOString();
+  console.log(JSON.stringify({ timestamp, event, ...details }));
+}
+
+app.get('/api/health/', (req, res) => {
+  res.json({
+    ok: true,
+    env: NODE_ENV,
+    contentRoot: CONTENT_ROOT,
+    time: new Date().toISOString(),
+  });
+});
+
+app.get('/api/public-config/', (req, res) => {
+  res.json({
+    providers: getPublicProviderDefaults(),
+  });
+});
+
+app.post('/api/login/', createLoginRateLimiter(), (req, res) => {
+  const password = typeof req.body.password === 'string' ? req.body.password : '';
+
+  if (password !== ADMIN_PASSWORD) {
+    recordFailedLogin(req);
+    logAudit('login.failed', { ip: getClientIp(req) });
+    return res.status(401).json({ error: 'Invalid password' });
+  }
+
+  clearLoginAttempts(req);
+  const token = jwt.sign({ admin: true }, JWT_SECRET, { expiresIn: '12h' });
+  res.cookie('token', token, {
+    httpOnly: true,
+    secure: COOKIE_SECURE,
+    sameSite: 'strict',
+    path: '/',
+    maxAge: 12 * 60 * 60 * 1000,
+  });
+
+  logAudit('login.succeeded', { ip: getClientIp(req) });
+  res.json({ success: true });
+});
+
+app.post('/api/logout/', (req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: COOKIE_SECURE,
+    sameSite: 'strict',
+    path: '/',
+  });
+
+  res.json({ success: true });
+});
+
+app.get('/api/check-auth/', (req, res) => {
+  const token = req.cookies.token;
+  if (!token) {
+    return res.json({ authenticated: false });
+  }
 
   try {
-    const results = {};
-    results.github = await pushToGitHub({ filePath, commitMessage, overwrite, markdown });
-    
-    if (syncToGitee) {
-      results.gitee = await pushToGitee({ filePath, commitMessage, overwrite, markdown });
-    }
-    
-    res.json({ success: true, urls: results });
+    jwt.verify(token, JWT_SECRET);
+    res.json({ authenticated: true });
   } catch (error) {
-    res.status(500).json({ error: error.response?.data?.message || error.message });
+    res.json({ authenticated: false });
   }
 });
 
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+app.post('/api/generate/', authenticate, async (req, res) => {
+  try {
+    const title = validateRequiredString(req.body.title, 'title', 160);
+    const image = validateOptionalString(req.body.image, 'image', 500);
+    const category = validateOptionalString(req.body.category, 'category', 80);
+    const tags = validateOptionalString(req.body.tags, 'tags', 200);
+    const keywords = validateOptionalString(req.body.keywords, 'keywords', 200);
+    const draft = validateRequiredString(req.body.draft, 'draft', 10000);
+    const targetLength = validateOptionalString(req.body.targetLength, 'targetLength', 40) || '1200-1800 words';
+    const requestedModel = validateOptionalString(req.body.model, 'model', 80);
+    const { apiKey, baseURL, model, providerKey } = resolveProvider(req.body.provider, requestedModel);
+    const prompt = buildPrompt({
+      title,
+      image,
+      category,
+      tags,
+      keywords,
+      draft,
+      targetLength,
+      today: getTodayInShanghai(),
+    });
+
+    const openai = new OpenAI({ apiKey, baseURL, timeout: API_TIMEOUT_MS });
+    const response = await openai.chat.completions.create({
+      model,
+      temperature: 0.7,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const output = response.choices?.[0]?.message?.content;
+    if (typeof output !== 'string' || !output.trim()) {
+      throw new Error('Model returned empty content.');
+    }
+
+    const { finalMarkdown, suggestedFilePath } = extractFilename(output);
+    logAudit('generate.succeeded', { provider: providerKey, model });
+    res.json({ markdown: finalMarkdown, suggestedFilePath });
+  } catch (error) {
+    const statusCode = error.statusCode || error.response?.status || 500;
+    logAudit('generate.failed', { error: error.message, statusCode });
+    res.status(statusCode).json({ error: error.response?.data?.message || error.message });
+  }
+});
+
+app.post('/api/publish/', authenticate, async (req, res) => {
+  try {
+    const filePath = normalizePublishPath(req.body.filePath);
+    const commitMessage = validateOptionalString(req.body.commitMessage, 'commitMessage', 160);
+    const markdown = validateMarkdown(req.body.markdown);
+    const overwrite = Boolean(req.body.overwrite);
+    const syncToGitee = Boolean(req.body.syncToGitee);
+
+    const results = {
+      github: await pushToGitHub({ filePath, commitMessage, overwrite, markdown }),
+    };
+
+    if (syncToGitee) {
+      results.gitee = await pushToGitee({ filePath, commitMessage, overwrite, markdown });
+    }
+
+    logAudit('publish.succeeded', { filePath, syncToGitee });
+    res.json({ success: true, urls: results });
+  } catch (error) {
+    const statusCode = error.statusCode || error.response?.status || 500;
+    logAudit('publish.failed', { error: error.message, statusCode });
+    res.status(statusCode).json({ error: error.response?.data?.message || error.message });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
