@@ -247,6 +247,10 @@
 
           <div class="mt-4 flex flex-wrap items-center gap-5 rounded-2xl border border-slate-200 bg-white/55 px-4 py-4">
             <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+              <input v-model="form.syncToGitHub" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
+              <span>同步到 GitHub</span>
+            </label>
+            <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
               <input v-model="form.syncToGitee" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
               <span>同步到 Gitee</span>
             </label>
@@ -338,7 +342,8 @@
           markdown: '',
           filePath: '',
           commitMessage: '',
-          syncToGitee: true,
+          syncToGitHub: false,
+          syncToGitee: false,
           overwrite: false,
         });
 
@@ -532,6 +537,11 @@
 
           if (!form.value.markdown.trim()) {
             showStatus('发布内容不能为空。', 'error', true);
+            return;
+          }
+
+          if (!form.value.syncToGitHub && !form.value.syncToGitee) {
+            showStatus('请至少勾选一个发布目标（GitHub 或 Gitee）。', 'error', true);
             return;
           }
 

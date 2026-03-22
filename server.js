@@ -274,10 +274,11 @@ function getPublicProviderDefaults() {
 
 function buildPrompt({ title, image, category, tags, keywords, draft, targetLength, today }) {
   const description = keywords || 'Generate a concise description based on the article content.';
-  const normalizedTags = tags || 'blog, ai';
+  const normalizedTags = tags || 'Generate some relevant tags based on the article content.';
   const normalizedCategory = category || 'General';
 
-  return `You are an experienced blog author.
+  return `You are an experienced blog author.You are good at writing technical articles in a clear, engaging, and informative style.Your task is to help write a high-quality Markdown article based on the provided draft and instructions.
+  you should make sure that the reader can easily understand the content and find it valuable. Please strictly follow the instructions and requirements below to create the article.
 
 Write a production-ready Markdown article that matches the language of the user input.
 Return Markdown only. Do not wrap the result in a code fence.
@@ -300,11 +301,13 @@ Requirements:
 - If the draft asks for Mermaid diagrams, output valid Mermaid blocks.
 - If the draft includes image URLs, convert them to Markdown image syntax.
 - Do not add a generic conclusion unless the draft asks for one.
-- End the document with an HTML comment in this exact format:
-<!--- FILENAME: english-kebab-case-file-name.md --->
+- End the document with an HTML comment in this exact format,it must be concise and summaried,remember that The shorter, the better,for example:
+<!--- FILENAME: parameters-management.md --->
 
 Draft and instructions:
-${draft}`;
+${draft}
+If there are some mistakes in the draft, please correct them in the final article, but do not mention that you have made corrections.
+`;
 }
 
 function getTodayInShanghai() {
@@ -392,7 +395,7 @@ async function pushToGitHub({ filePath, commitMessage, overwrite, markdown }) {
       timeout: API_TIMEOUT_MS,
     });
     sha = data.sha;
-    if (!overwrite) {
+    if (sha && !overwrite) {
       throw conflict('File already exists on GitHub. Enable overwrite to replace it.');
     }
   } catch (error) {
@@ -436,7 +439,7 @@ async function pushToGitee({ filePath, commitMessage, overwrite, markdown }) {
       timeout: API_TIMEOUT_MS,
     });
     sha = data.sha;
-    if (!overwrite) {
+    if (sha && !overwrite) {
       throw conflict('File already exists on Gitee. Enable overwrite to replace it.');
     }
   } catch (error) {
@@ -580,11 +583,18 @@ app.post('/api/publish/', authenticate, async (req, res) => {
     const commitMessage = validateOptionalString(req.body.commitMessage, 'commitMessage', 160);
     const markdown = validateMarkdown(req.body.markdown);
     const overwrite = Boolean(req.body.overwrite);
+    const syncToGitHub = Boolean(req.body.syncToGitHub);
     const syncToGitee = Boolean(req.body.syncToGitee);
 
-    const results = {
-      github: await pushToGitHub({ filePath, commitMessage, overwrite, markdown }),
-    };
+    if (!syncToGitHub && !syncToGitee) {
+      throw badRequest('请至少选择一个发布目标（GitHub 或 Gitee）。');
+    }
+
+    const results = {};
+
+    if (syncToGitHub) {
+      results.github = await pushToGitHub({ filePath, commitMessage, overwrite, markdown });
+    }
 
     if (syncToGitee) {
       results.gitee = await pushToGitee({ filePath, commitMessage, overwrite, markdown });
