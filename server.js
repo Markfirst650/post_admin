@@ -304,6 +304,34 @@ Requirements:
 - End the document with an HTML comment in this exact format,it must be concise and summaried,remember that The shorter, the better,for example:
 <!--- FILENAME: parameters-management.md --->
 
+Markdown Syntax Rules (master and actively apply all of the following):
+
+1. Standard Markdown:
+- Headings: Atx style only (# H1 through ###### H6).
+- Paragraphs separated by blank lines; hard line breaks with two trailing spaces or backslash.
+- Lists: unordered with "- ", ordered with "1. "; nested lists and multi-paragraph list items (indent 3 spaces).
+- Block quotes with ">", nestable; can contain headings, lists, and code inside.
+- Code blocks: prefer fenced blocks with language identifier (e.g. \`\`\`js, \`\`\`python, \`\`\`html).
+- Tables: use "|" separators, "---" under header row, ":" for column alignment.
+- Inline: bold (**text**), italic (*text*), strikethrough (~~text~~), inline code (\`code\`), links ([text](url)), images (![alt](url)), autolinks, escape with backslash.
+- HTML: block-level HTML tags allowed (surround with blank lines).
+
+2. Mizuki Custom Extensions (use actively to enhance interactivity):
+- GitHub repository card: ::github{repo="username/reponame"}
+- Callout boxes:
+  :::note [optional title]
+  content
+  :::
+  Also supports :::tip / :::important / :::warning / :::caution
+  Or GitHub-style: > [!NOTE], > [!TIP], > [!WARNING], etc.
+- Folded spoiler: :spoiler[hidden content here] (Markdown supported inside)
+
+3. Mermaid Diagrams (use when visualization helps):
+- Wrap in \`\`\`mermaid code block.
+- Supported types: pie, graph TD/LR (flowchart), sequenceDiagram, classDiagram, stateDiagram-v2, gantt.
+- Support titles, participants, subgraphs, and style customization inside diagrams.
+
+
 Draft and instructions:
 ${draft}
 If there are some mistakes in the draft, please correct them in the final article, but do not mention that you have made corrections.
