@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-一个为 Markdown 博客作者设计的 AI 写作与发布管理系统。
+一个面向 Markdown 博客作者的 AI 写作与发布后台。
 </p>
 
 <p align="center">
@@ -33,137 +33,57 @@
 
 ## 项目简介
 
-大多数内容后台的问题，不在于按钮太少，而在于流程太碎。
+post_admin 的目标很直接：把“和模型对话、整理 frontmatter、调整 Markdown、决定文件名、提交到内容仓库”这条原本分散的流程，压缩成一个连续动作。
 
-你写一篇文章，往往会在这几件事之间来回切换：和模型对话、整理 frontmatter、润色 Markdown、决定文件名、提交到仓库、确认是否触发工作流。每一个步骤单看都不复杂，但串起来就会很消耗注意力。
-
-post_admin 的目标很明确：把生成、校对、预览、命名、提交、发布压缩成一条短路径。它不是一个通用 CMS，也不试图接管你的博客系统；它只专注解决一个足够高频、也足够实际的问题：如何更快地把一篇内容安全、整洁、可落库地送进你的 Markdown 内容仓库。
-
-> 当前版本默认将文章发布到 `src/content/posts/`，并自动为提交信息追加 `[skip ci]`，适合只推送 md 内容，不触发额外工作流的内容发布模式。
+它不是通用 CMS，也不是博客系统替代品，而是一个专注于 Markdown 内容生产和发布的管理台。当前版本默认将内容写入 `src/content/posts/`，并自动为提交信息追加 `[skip ci]`，适合只推送 md 内容、尽量不触发额外工作流的场景。
 
 ---
 
-## 项目亮点
+## 这版更新了什么
+
+- 前端支持浅色 / 深色主题切换，并会记住上次选择
+- 支持中英文界面切换，便于不同语言环境使用
+- Markdown 预览支持 KaTeX 数学公式渲染
+- 登录后可一键重置表单，快速开始新文章
+- 保留了全屏双栏预览，方便编辑和对照检查
+- 支持 GitHub 发布，并可选同步到 Gitee
+
+---
+
+## 核心能力
 
 - 单页完成登录、生成、编辑、预览、发布
-- 强约束模型输出 Markdown 纯文本和 YAML frontmatter
-- 自动生成建议文件名，减少手动命名成本
-- 支持 GitHub 发布，并可选同步到 Gitee
-- 提交信息自动补充跳过 CI 标记，避免无意义构建
+- 服务端基于 JWT Cookie 做鉴权
+- 支持管理员密码登录，并带有登录限流
+- 支持 `DeepSeek`、`OpenAI` 兼容接口、`GLM`、`MiniMax`
+- 生成结果强制为 Markdown 正文 + YAML frontmatter
+- 自动从模型输出中提取建议文件名
+- 支持同名文件覆盖发布
+- 自动为 commit message 追加 `[skip ci]`
 - 适合 Astro、Nuxt Content、VitePress、Hexo 等 Markdown 驱动站点
 
 ---
 
-## 界面预览
+## 页面功能
 
-### 1. 登录页
-
-![Login Preview](https://cdn-r2.solmount.top/image/2026/03/14/69b558fc64f8f.png)
-
-### 2. 内容生成与发布页
-
-![Generate Preview](https://cdn-r2.solmount.top/image/2026/03/14/69b5598274d73.png)
-
-### 3. 全屏双栏预览
-
-![Preview Mode](https://cdn-r2.solmount.top/image/2026/03/14/69b55a06dd954.png)
-
-
----
-
-## 为什么它真的有用
-
-这个项目真正节省的，不是 API 调用次数，而是上下文切换。
-
-- 你不需要先去聊天窗口生成初稿，再手动复制回编辑器。
-- 你不需要每次都重新组织 frontmatter 字段。
-- 你不需要在提交前再想一遍文件名应该怎么取。
-- 你不需要担心一次普通内容更新误触发整条 CI/CD 流程。
-
-它做的不是替你写作，而是把一套原本分散的发布动作变成一个连续动作。
-
----
-
-## 功能特性
-
-- 管理员密码登录，服务端基于 JWT Cookie 做鉴权
-- 支持 `DeepSeek`、`OpenAI 兼容接口`、`MiniMax`、`GLM`
-- 生成结果强制为 Markdown 正文 + YAML frontmatter
-- 自动填充 `published`、`updated`、`description`、`image`、`tags`、`category`
-- 自动从模型输出中提取建议文件名
-- 内置 Markdown 编辑区，支持二次润色
-- 支持实时渲染和全屏双栏沉浸式预览
-- 支持推送到 GitHub
-- 支持可选同步到 Gitee
-- 支持同名文件覆盖发布
-- 自动为 commit message 追加 `[skip ci]`
-
----
-
-## 系统架构
-
-```mermaid
-flowchart LR
-U[Admin User] --> W[Web Admin Console]
-W --> A[/api/login/]
-W --> G[/api/generate/]
-W --> P[/api/publish/]
-A --> S[Express Server]
-G --> S
-P --> S
-S --> J[JWT Cookie Auth]
-S --> M[LLM Provider]
-S --> GH[GitHub Contents API]
-S --> GT[Gitee Contents API]
-M --> MD[Markdown + Frontmatter]
-MD --> W
-GH --> R1[src/content/posts/...]
-GT --> R2[src/content/posts/...]
-```
-
-这套结构并不复杂，但足够有效：前端负责把写作意图组织成结构化输入，服务端负责鉴权、生成和发布，最终目标不是数据库，而是你的内容仓库本身。
+- 登录页：输入管理员密码后进入后台
+- 生成区：填写标题、分类、标签、关键词、目标长度和草稿指令，提交后由模型生成内容
+- 编辑区：手动修改 Markdown、文件路径和提交信息
+- 发布区：选择是否同步到 GitHub、是否同步到 Gitee、是否覆盖同名文件
+- 预览区：支持实时渲染和全屏双栏预览
 
 ---
 
 ## 技术栈
 
-- Node.js
-- Express
-- Vue 3（CDN）
-- Tailwind CSS（CDN）
+- Node.js 18+
+- Express 4.x
+- Vue 3（CDN 引入）
+- Tailwind CSS（CDN 引入）
 - Axios
 - Marked
+- KaTeX
 - OpenAI Node SDK
-
----
-
-## 项目结构
-
-```text
-post_admin/
- public/
-   favicon.ico
-   index.html
- .env.example
- package.json
- pnpm-lock.yaml
- README.md
- server.js
-```
-
----
-
-## 工作流说明
-
-整个发布链路大致如下：
-
-1. 管理员输入后台密码，服务端验证后下发 JWT Cookie。
-2. 用户填写标题、标签、关键词、分类、目标字数和草稿内容。
-3. 服务端根据表单内容构造 Prompt，请模型返回符合博客规范的 Markdown。
-4. 模型输出正文、frontmatter，并在尾部附带建议文件名。
-5. 用户在编辑区进行最终校对，并决定是否覆盖同名文件、是否同步 Gitee。
-6. 服务端通过 GitHub Contents API 写入 `src/content/posts/`。
-7. 如果启用同步，则继续把同一份内容推送到 Gitee。
 
 ---
 
@@ -185,19 +105,19 @@ npm install
 
 ### 2. 准备环境变量
 
-复制示例配置：
+仓库已经提供示例文件 `.env.example`。你可以先复制一份：
 
 ```bash
 cp .env.example .env
 ```
 
-Windows PowerShell 可以这样做：
+Windows PowerShell 可以使用：
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-然后按你的实际模型和仓库配置填写 `.env`。
+然后按自己的模型服务和仓库信息填写 `.env`。
 
 ### 3. 启动开发服务
 
@@ -205,7 +125,7 @@ Copy-Item .env.example .env
 pnpm dev
 ```
 
-或：
+如果你使用 npm：
 
 ```bash
 npm run dev
@@ -227,26 +147,45 @@ http://localhost:3000
 
 ## 环境变量说明
 
-仓库已经提供示例文件：`.env.example`。
-
 ### 基础配置
 
 - `PORT`: 服务端口，默认 `3000`
 - `NODE_ENV`: 运行环境，生产环境下 Cookie 会启用 `secure`
-- `ADMIN_PASSWORD`: 管理后台登录密码
-- `JWT_SECRET`: JWT 签名密钥
+- `ADMIN_PASSWORD`: 管理后台登录密码，至少 12 个字符
+- `JWT_SECRET`: JWT 签名密钥，至少 32 个字符
+- `COOKIE_SECURE`: 是否强制仅在 HTTPS 下发送 Cookie
+- `TRUST_PROXY`: 是否信任反向代理
+- `LOGIN_WINDOW_MS`: 登录限流时间窗口，默认 900000
+- `LOGIN_MAX_ATTEMPTS`: 登录限流次数，默认 10
+- `API_TIMEOUT_MS`: 模型和发布接口超时时间，默认 30000
 
-### 模型服务配置
+### 内容配置
+
+- `CONTENT_ROOT`: 发布内容根目录，默认 `src/content/posts`
+
+### OpenAI 兼容配置
 
 - `OPENAI_API_KEY`: OpenAI 或兼容接口密钥
 - `OPENAI_BASE_URL`: OpenAI 兼容接口地址，可留空
 - `OPENAI_MODEL`: 默认模型名
+
+### DeepSeek 配置
+
 - `DEEPSEEK_API_KEY`: DeepSeek 密钥
 - `DEEPSEEK_BASE_URL`: DeepSeek 接口地址
+- `DEEPSEEK_MODEL`: 默认模型名
+
+### GLM 配置
+
 - `GLM_API_KEY`: GLM 密钥
 - `GLM_BASE_URL`: GLM 接口地址
+- `GLM_MODEL`: 默认模型名
+
+### MiniMax 配置
+
 - `MINIMAX_API_KEY`: MiniMax 密钥
 - `MINIMAX_BASE_URL`: MiniMax 接口地址
+- `MINIMAX_MODEL`: 默认模型名
 
 ### GitHub 发布配置
 
@@ -255,14 +194,76 @@ http://localhost:3000
 - `GITHUB_BRANCH`: 目标分支，默认 `main`
 - `GITHUB_TOKEN`: 具有内容写入权限的 Token
 
-### Gitee 发布配置
+### Gitee 同步配置
 
 - `GITEE_OWNER`: Gitee 用户名或组织名
-- `GITEE_REPO`: Gitee 仓库名
+- `GITEE_REPO`: 目标仓库名
 - `GITEE_BRANCH`: 目标分支，默认 `master`
 - `GITEE_TOKEN`: Gitee 访问令牌
 
 ---
+
+## 接口说明
+
+### 公开接口
+
+- `GET /api/health/`: 健康检查，返回运行状态和内容根目录
+- `GET /api/public-config/`: 获取公开配置和模型默认值
+
+### 认证接口
+
+- `POST /api/login/`: 管理员登录
+- `POST /api/logout/`: 退出登录
+- `GET /api/check-auth/`: 检查当前登录状态
+
+### 业务接口
+
+- `POST /api/generate/`: 根据表单信息生成 Markdown 内容
+- `POST /api/publish/`: 将内容发布到 GitHub，或同步到 Gitee
+
+其中 `generate` 和 `publish` 都需要先登录。
+
+---
+
+## 发布流程
+
+1. 管理员输入后台密码，服务端验证后下发 JWT Cookie。
+2. 用户填写标题、标签、关键词、分类、目标字数和草稿内容。
+3. 服务端根据表单内容构造 Prompt，请模型返回符合博客规范的 Markdown。
+4. 模型输出正文、frontmatter，并在尾部附带建议文件名。
+5. 用户在编辑区进行最终校对，并决定是否覆盖同名文件、是否同步 Gitee。
+6. 服务端通过 GitHub Contents API 写入 `src/content/posts/`。
+7. 如果启用同步，则继续把同一份内容推送到 Gitee。
+
+---
+
+## 项目结构
+
+```text
+post_admin/
+ public/
+   index.html
+   favicon.ico
+ .env.example
+ package.json
+ pnpm-lock.yaml
+ README.md
+ README.en.md
+ server.js
+```
+
+---
+
+## 说明
+
+这个项目节省的不是模型调用次数，而是上下文切换。
+
+- 不需要先在聊天窗口生成初稿，再手动复制回编辑器
+- 不需要每次都重复整理 frontmatter
+- 不需要在发布前再临时想文件名
+- 不需要担心普通内容更新误触发整条 CI/CD 流程
+
+如果你接下来要继续调整文案，我也可以再补一版更偏“项目介绍页”风格的 README，或者顺手写英文版。
 
 ## 使用指南
 

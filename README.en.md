@@ -1,163 +1,72 @@
 # post_admin
 
 <p align="center">
-An AI writing and publishing console built for Markdown-first blog authors.
+<a href="README.md">简体中文</a> | <a href="README.en.md">English</a>
 </p>
 
 <p align="center">
-<img src="https://img.shields.io/badge/Node.js-18%2B-3c873a?style=flat-square" alt="Node.js">
-<img src="https://img.shields.io/badge/Express-4.x-111111?style=flat-square" alt="Express">
-<img src="https://img.shields.io/badge/Vue-3-42b883?style=flat-square" alt="Vue 3">
-<img src="https://img.shields.io/badge/Tailwind_CSS-CDN-06b6d4?style=flat-square" alt="Tailwind CSS">
-<img src="https://img.shields.io/badge/AI-OpenAI%20%7C%20DeepSeek%20%7C%20GLM%20%7C%20MiniMax-8b5cf6?style=flat-square" alt="AI Providers">
-<img src="https://img.shields.io/badge/Content-Markdown-0f766e?style=flat-square" alt="Markdown">
+An AI writing and publishing console for Markdown-first blog authors.
 </p>
 
 <p align="center">
-<a href="https://github.com/Markfirst650/post_admin/stargazers"><img src="https://img.shields.io/github/stars/Markfirst650/post_admin?style=flat-square" alt="GitHub stars"></a>
-<a href="https://github.com/Markfirst650/post_admin/network/members"><img src="https://img.shields.io/github/forks/Markfirst650/post_admin?style=flat-square" alt="GitHub forks"></a>
-<a href="https://github.com/Markfirst650/post_admin/issues"><img src="https://img.shields.io/github/issues/Markfirst650/post_admin?style=flat-square" alt="GitHub issues"></a>
-<a href="https://github.com/Markfirst650/post_admin/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Markfirst650/post_admin?style=flat-square" alt="License"></a>
-<a href="https://github.com/Markfirst650/post_admin/commits/main"><img src="https://img.shields.io/github/last-commit/Markfirst650/post_admin?style=flat-square" alt="Last commit"></a>
-</p>
-
-<p align="center">
-From a rough draft to a frontmatter-ready Markdown article to a push into your content repository, all in one place.
+From draft, to generation, to review, to publishing, everything stays in one page.
 </p>
 
 ---
 
-## Introduction
+## Overview
 
-The pain of most content back offices is not a lack of features. It is workflow fragmentation.
+post_admin is designed to compress a fragmented publishing flow into a single continuous action: talking to a model, organizing frontmatter, editing Markdown, deciding file names, and pushing content into your repository.
 
-When writing one post, you often jump between several contexts: chatting with a model, organizing frontmatter, polishing Markdown, deciding the file name, committing, and making sure CI does not run unnecessarily. Each step is small, but the context switching is expensive.
-
-post_admin focuses on shortening that path. It is not a general CMS and does not try to replace your blog system. It solves one practical, high-frequency problem: turning ideas into clean, publishable Markdown and shipping it directly into your content repository.
-
-> By default, this project publishes to src/content/posts/ and appends [skip ci] to commit messages, which is ideal for markdown-only content updates without triggering extra workflows.
+It is not a general CMS and does not try to replace your blog system. It is a focused console for producing and publishing Markdown content. In the current version, content is written to `src/content/posts/` by default, and commit messages are automatically appended with `[skip ci]`, which is a good fit for markdown-only updates that should not trigger extra workflows.
 
 ---
 
-## Highlights
+## What Changed in This Version
 
-- End-to-end flow in one page: login, generate, edit, preview, publish
-- Strong output constraints: plain Markdown + YAML frontmatter
-- Suggested file name extracted automatically from model output
-- GitHub publishing with optional Gitee sync
-- Automatic skip-CI marker for content-only commits
-- Great fit for Astro, Nuxt Content, VitePress, Hexo, and other Markdown-driven sites
-
----
-
-## Screenshots
-
-### 1. Login Page
-
-![Login Preview](https://cdn-r2.solmount.top/image/2026/03/14/69b558fc64f8f.png)
-
-### 2. Generate and Publish Page
-
-![Generate Preview](https://cdn-r2.solmount.top/image/2026/03/14/69b5598274d73.png)
-
-### 3. Fullscreen Split Preview
-
-![Preview Mode](https://cdn-r2.solmount.top/image/2026/03/14/69b55a06dd954.png)
+- Added light and dark theme switching with persistence
+- Added Chinese and English UI switching
+- Added KaTeX rendering in the Markdown preview
+- Added one-click form reset after login
+- Kept the immersive fullscreen split preview
+- Supports GitHub publishing with optional Gitee sync
 
 ---
 
-## Why It Is Useful
+## Core Capabilities
 
-What this project really saves is not API calls. It saves context switches.
-
-- No need to draft in a chat window and manually copy content back.
-- No need to rebuild frontmatter structure every time.
-- No need to repeatedly think about naming conventions before publish.
-- No need to worry about accidental full CI/CD runs for normal content updates.
-
-It does not replace your writing. It streamlines your publishing operations.
-
----
-
-## Features
-
-- Admin-password login with JWT Cookie auth on the server side
-- Supports DeepSeek, OpenAI-compatible APIs, MiniMax, and GLM
-- Forces generation output to Markdown body + YAML frontmatter
-- Auto-fills published, updated, description, image, tags, and category
-- Extracts suggested filename from model output
-- Built-in Markdown editor for manual polishing
-- Real-time render + immersive fullscreen split preview
-- Publish to GitHub
-- Optional sync to Gitee
-- Optional overwrite for same-name files
-- Auto-appends [skip ci] to commit messages
+- One-page flow for login, generate, edit, preview, and publish
+- JWT Cookie-based authentication on the server side
+- Admin-password login with login rate limiting
+- Supports DeepSeek, OpenAI-compatible APIs, GLM, and MiniMax
+- Forces generation output to Markdown body plus YAML frontmatter
+- Extracts a suggested file name from the model output
+- Supports overwriting same-name files
+- Automatically appends `[skip ci]` to commit messages
+- A good fit for Astro, Nuxt Content, VitePress, Hexo, and other Markdown-driven sites
 
 ---
 
-## Architecture
+## Page Features
 
-```mermaid
-flowchart LR
-U[Admin User] --> W[Web Admin Console]
-W --> A[/api/login/]
-W --> G[/api/generate/]
-W --> P[/api/publish/]
-A --> S[Express Server]
-G --> S
-P --> S
-S --> J[JWT Cookie Auth]
-S --> M[LLM Provider]
-S --> GH[GitHub Contents API]
-S --> GT[Gitee Contents API]
-M --> MD[Markdown + Frontmatter]
-MD --> W
-GH --> R1[src/content/posts/...]
-GT --> R2[src/content/posts/...]
-```
-
-The architecture is intentionally simple: the frontend captures writing intent as structured input, and the backend handles auth, generation, and publishing. The final destination is your content repository, not a database.
+- Login page: enter the admin password to enter the console
+- Generation panel: fill in title, category, tags, keywords, target length, and draft instructions, then generate content with the model
+- Editing panel: manually adjust Markdown, file path, and commit message
+- Publishing panel: choose whether to sync to GitHub, sync to Gitee, or overwrite an existing file
+- Preview panel: supports live rendering and fullscreen split preview
 
 ---
 
 ## Tech Stack
 
-- Node.js
-- Express
-- Vue 3 (CDN)
-- Tailwind CSS (CDN)
+- Node.js 18+
+- Express 4.x
+- Vue 3 via CDN
+- Tailwind CSS via CDN
 - Axios
 - Marked
+- KaTeX
 - OpenAI Node SDK
-
----
-
-## Project Structure
-
-```text
-post_admin/
- public/
-   favicon.ico
-   index.html
- .env.example
- package.json
- pnpm-lock.yaml
- README.md
- README.en.md
- server.js
-```
-
----
-
-## Workflow
-
-1. Admin logs in; server validates password and issues JWT Cookie.
-2. User fills title, tags, keywords, category, target length, and draft.
-3. Server builds prompt and requests model output in blog-ready Markdown format.
-4. Model returns content + frontmatter and a suggested filename.
-5. User performs final edits and decides overwrite/sync options.
-6. Server writes content to GitHub via the Contents API under src/content/posts/.
-7. If enabled, the same content is synced to Gitee.
 
 ---
 
@@ -179,7 +88,7 @@ npm install
 
 ### 2. Prepare Environment Variables
 
-Copy the template:
+The repository includes a sample file at `.env.example`. Copy it first:
 
 ```bash
 cp .env.example .env
@@ -191,21 +100,21 @@ On Windows PowerShell:
 Copy-Item .env.example .env
 ```
 
-Then fill .env with your model and repository settings.
+Then fill in your model provider and repository settings.
 
-### 3. Start Development Server
+### 3. Start the Development Server
 
 ```bash
 pnpm dev
 ```
 
-or
+or:
 
 ```bash
 npm run dev
 ```
 
-### 4. Start Production Server
+### 4. Start the Production Server
 
 ```bash
 pnpm start
@@ -221,40 +130,122 @@ http://localhost:3000
 
 ## Environment Variables
 
-This repo already provides .env.example.
+### Basic Settings
 
-### Basic
+- `PORT`: service port, default `3000`
+- `NODE_ENV`: runtime mode; cookies become secure in production
+- `ADMIN_PASSWORD`: admin login password, at least 12 characters
+- `JWT_SECRET`: JWT signing secret, at least 32 characters
+- `COOKIE_SECURE`: force secure cookies over HTTPS only
+- `TRUST_PROXY`: trust the reverse proxy
+- `LOGIN_WINDOW_MS`: login rate-limit window, default `900000`
+- `LOGIN_MAX_ATTEMPTS`: login rate-limit count, default `10`
+- `API_TIMEOUT_MS`: timeout for model and publishing requests, default `30000`
 
-- PORT: service port (default 3000)
-- NODE_ENV: runtime mode; secure cookie in production
-- ADMIN_PASSWORD: admin login password
-- JWT_SECRET: JWT signing secret
+### Content Settings
 
-### Model Provider Settings
+- `CONTENT_ROOT`: content root directory, default `src/content/posts`
 
-- OPENAI_API_KEY: OpenAI or OpenAI-compatible API key
-- OPENAI_BASE_URL: OpenAI-compatible base URL (optional)
-- OPENAI_MODEL: default model name
-- DEEPSEEK_API_KEY: DeepSeek API key
-- DEEPSEEK_BASE_URL: DeepSeek API base URL
-- GLM_API_KEY: GLM API key
-- GLM_BASE_URL: GLM API base URL
-- MINIMAX_API_KEY: MiniMax API key
-- MINIMAX_BASE_URL: MiniMax API base URL
+### OpenAI-Compatible Settings
 
-### GitHub Publish Settings
+- `OPENAI_API_KEY`: OpenAI or OpenAI-compatible API key
+- `OPENAI_BASE_URL`: OpenAI-compatible base URL, optional
+- `OPENAI_MODEL`: default model name
 
-- GITHUB_OWNER: GitHub owner (user/org)
-- GITHUB_REPO: target repository name
-- GITHUB_BRANCH: target branch (default main)
-- GITHUB_TOKEN: token with content write permission
+### DeepSeek Settings
 
-### Gitee Publish Settings
+- `DEEPSEEK_API_KEY`: DeepSeek API key
+- `DEEPSEEK_BASE_URL`: DeepSeek API base URL
+- `DEEPSEEK_MODEL`: default model name
 
-- GITEE_OWNER: Gitee owner (user/org)
-- GITEE_REPO: target Gitee repository name
-- GITEE_BRANCH: target branch (default master)
-- GITEE_TOKEN: Gitee access token
+### GLM Settings
+
+- `GLM_API_KEY`: GLM API key
+- `GLM_BASE_URL`: GLM API base URL
+- `GLM_MODEL`: default model name
+
+### MiniMax Settings
+
+- `MINIMAX_API_KEY`: MiniMax API key
+- `MINIMAX_BASE_URL`: MiniMax API base URL
+- `MINIMAX_MODEL`: default model name
+
+### GitHub Publishing Settings
+
+- `GITHUB_OWNER`: GitHub owner, user or organization
+- `GITHUB_REPO`: target repository name
+- `GITHUB_BRANCH`: target branch, default `main`
+- `GITHUB_TOKEN`: token with content write permission
+
+### Gitee Sync Settings
+
+- `GITEE_OWNER`: Gitee owner, user or organization
+- `GITEE_REPO`: target repository name
+- `GITEE_BRANCH`: target branch, default `master`
+- `GITEE_TOKEN`: Gitee access token
+
+---
+
+## API Routes
+
+### Public Routes
+
+- `GET /api/health/`: health check, returns runtime status and content root
+- `GET /api/public-config/`: fetch public config and default provider values
+
+### Auth Routes
+
+- `POST /api/login/`: admin login
+- `POST /api/logout/`: log out
+- `GET /api/check-auth/`: check current authentication state
+
+### Business Routes
+
+- `POST /api/generate/`: generate Markdown content from the form data
+- `POST /api/publish/`: publish to GitHub or sync to Gitee
+
+`generate` and `publish` both require authentication.
+
+---
+
+## Publishing Flow
+
+1. The admin enters the password and the server issues a JWT Cookie.
+2. The user fills in title, tags, keywords, category, target length, and draft instructions.
+3. The server builds a prompt and asks the model to return blog-ready Markdown.
+4. The model returns content plus frontmatter, with a suggested file name appended.
+5. The user performs final edits and decides whether to overwrite the file or sync to Gitee.
+6. The server writes the content to `src/content/posts/` through the GitHub Contents API.
+7. If sync is enabled, the same content is pushed to Gitee as well.
+
+---
+
+## Project Structure
+
+```text
+post_admin/
+ public/
+   index.html
+   favicon.ico
+ .env.example
+ package.json
+ pnpm-lock.yaml
+ README.md
+ README.en.md
+ server.js
+```
+
+---
+
+## Notes
+
+What this project saves is not API calls. It saves context switches.
+
+- No need to draft in a chat window and copy content back manually
+- No need to rebuild frontmatter on every post
+- No need to think about file naming again before publishing
+- No need to worry about accidental full CI/CD runs for ordinary content updates
+
 
 ---
 

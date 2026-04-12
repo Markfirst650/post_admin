@@ -6,12 +6,18 @@
   <title>post_admin</title>
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script>
+    if (localStorage.getItem('post-admin-theme') === 'dark') {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
   <style>
     :root {
       color-scheme: light;
@@ -21,6 +27,16 @@
       --panel-border: rgba(78, 61, 46, 0.12);
       --accent: #0f766e;
       --accent-2: #9a3412;
+    }
+
+    .dark {
+      color-scheme: dark;
+      --bg: #0f172a;
+      --ink: #e2e8f0;
+      --panel: rgba(30, 41, 59, 0.82);
+      --panel-border: rgba(148, 163, 184, 0.15);
+      --accent: #14b8a6;
+      --accent-2: #fb923c;
     }
 
     body {
@@ -34,11 +50,22 @@
       font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     }
 
+    .dark body {
+      background:
+        radial-gradient(circle at top left, rgba(20, 184, 166, 0.10), transparent 30%),
+        radial-gradient(circle at top right, rgba(251, 146, 60, 0.08), transparent 25%),
+        linear-gradient(135deg, #0f172a 0%, #1e293b 45%, #0f172a 100%);
+    }
+
     .glass {
       background: var(--panel);
       backdrop-filter: blur(18px);
       border: 1px solid var(--panel-border);
       box-shadow: 0 20px 60px rgba(31, 41, 55, 0.12);
+    }
+
+    .dark .glass {
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
     }
 
     .prose-preview h1,
@@ -63,6 +90,10 @@
       padding: 0.15rem 0.35rem;
     }
 
+    .dark .prose-preview code {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
     .prose-preview pre {
       background: #172033;
       color: #f8fafc;
@@ -77,8 +108,23 @@
       color: #334155;
     }
 
+    .dark .prose-preview blockquote {
+      color: #94a3b8;
+    }
+
     .prose-preview .katex-display {
       overflow-x: auto;
+    }
+
+    .tb {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 2.25rem;
+      border-radius: 0.75rem;
+      border: 1px solid;
+      transition: all 0.2s ease;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -90,28 +136,51 @@
         'fixed left-1/2 top-4 z-50 w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl px-4 py-3 text-sm font-medium shadow-lg',
         status.type === 'error' ? 'bg-rose-600 text-white' : '',
         status.type === 'success' ? 'bg-emerald-600 text-white' : '',
-        status.type === 'info' ? 'bg-slate-900 text-white' : ''
+        status.type === 'info' ? 'bg-slate-900 text-white dark:bg-slate-700' : ''
       ]"
     >
       <div class="flex items-center justify-between gap-4">
         <span>{{ status.message }}</span>
-        <button class="rounded-full px-2 py-1 text-white/80 hover:text-white" @click="clearStatus">关闭</button>
+        <button class="rounded-full px-2 py-1 text-white/80 hover:text-white" @click="clearStatus">{{ t.close }}</button>
       </div>
     </div>
 
-    <header class="border-b border-black/5 bg-white/55 backdrop-blur-xl">
+    <header class="border-b border-black/5 bg-white/55 backdrop-blur-xl dark:border-white/5 dark:bg-slate-900/70">
       <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.32em] text-slate-500">post_admin</p>
-          <h1 class="mt-1 text-2xl font-black tracking-tight text-slate-900">AI 写作与发布后台</h1>
+          <p class="text-xs font-semibold uppercase tracking-[0.32em] text-slate-500 dark:text-slate-400">post_admin</p>
+          <h1 class="mt-1 text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">{{ t.siteTitle }}</h1>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
+          <button
+            @click="toggleTheme"
+            :title="t.themeTooltip"
+            class="tb w-9 border-slate-200 bg-white/70 text-slate-500 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-500 dark:border-slate-600 dark:bg-slate-700/70 dark:text-slate-400 dark:hover:border-amber-500/50 dark:hover:bg-slate-600 dark:hover:text-amber-400"
+          >
+            <svg v-if="theme === 'dark'" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </button>
+          <button
+            @click="toggleLang"
+            :title="t.langTooltip"
+            class="tb px-3 border-slate-200 bg-white/70 text-xs font-bold text-slate-500 hover:border-slate-400 hover:bg-white hover:text-slate-900 dark:border-slate-600 dark:bg-slate-700/70 dark:text-slate-400 dark:hover:border-slate-400 dark:hover:bg-slate-600 dark:hover:text-white"
+          >
+            {{ lang === 'zh' ? 'EN' : '中文' }}
+          </button>
+          <button
+            v-if="isLoggedIn"
+            @click="handleRefresh"
+            :title="t.refreshTooltip"
+            class="tb w-9 border-slate-200 bg-white/70 text-slate-500 hover:border-teal-300 hover:bg-teal-50 hover:text-teal-600 dark:border-slate-600 dark:bg-slate-700/70 dark:text-slate-400 dark:hover:border-teal-500/50 dark:hover:bg-slate-600 dark:hover:text-teal-400"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          </button>
           <button
             v-if="isLoggedIn"
             @click="handleLogout"
-            class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+            class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600"
           >
-            退出登录
+            {{ t.logout }}
           </button>
         </div>
       </div>
@@ -120,20 +189,17 @@
     <main :class="isLoggedIn ? 'mx-auto flex min-h-[calc(100vh-81px)] max-w-7xl flex-col px-4 py-6 sm:px-6 lg:px-8' : 'mx-auto flex min-h-[calc(100vh-81px)] max-w-7xl items-center justify-center px-4 py-6 sm:px-6 lg:px-8'">
       <section v-if="!isLoggedIn" class="mx-auto w-full max-w-md">
         <div class="glass rounded-[2rem] p-8 sm:p-10">
-          <p class="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">Sign In</p>
-          <h2 class="mt-3 text-3xl font-black text-slate-900">进入发布后台</h2>
-          <p class="mt-3 text-sm leading-6 text-slate-600">
-            当前版本默认启用更严格的 cookie、限流和服务端校验。适合放在 HTTPS 和反向代理之后公开访问。
-          </p>
+          <p class="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">Sign In</p>
+          <h2 class="mt-3 text-3xl font-black text-slate-900 dark:text-slate-100">{{ t.loginTitle }}</h2>
 
           <div class="mt-8 space-y-4">
             <label class="block">
-              <span class="mb-2 block text-sm font-semibold text-slate-700">管理员密码</span>
+              <span class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">{{ t.adminPassword }}</span>
               <input
                 v-model="loginPassword"
                 type="password"
-                class="w-full rounded-2xl border border-slate-300 bg-white/75 px-4 py-4 text-base text-slate-900 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200"
-                placeholder="输入 ADMIN_PASSWORD"
+                class="w-full rounded-2xl border border-slate-300 bg-white/75 px-4 py-4 text-base text-slate-900 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-teal-500 dark:focus:ring-teal-900"
+                :placeholder="t.passwordPlaceholder"
                 @keyup.enter="handleLogin"
               >
             </label>
@@ -142,7 +208,7 @@
               :disabled="loading.auth"
               class="w-full rounded-2xl bg-teal-700 px-4 py-4 text-base font-bold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {{ loading.auth ? '正在验证...' : '登录' }}
+              {{ loading.auth ? t.verifying : t.login }}
             </button>
           </div>
         </div>
@@ -152,16 +218,16 @@
         <div class="glass flex h-full flex-col rounded-[2rem] p-5 sm:p-6">
           <div class="mb-4 flex items-center justify-between">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Generate</p>
-              <h2 class="mt-1 text-2xl font-black text-slate-900">生成配置</h2>
+              <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">{{ t.generate }}</p>
+              <h2 class="mt-1 text-2xl font-black text-slate-900 dark:text-slate-100">{{ t.genConfig }}</h2>
             </div>
           </div>
 
           <div class="flex flex-1 flex-col gap-2.5">
           <div class="grid grid-cols-1 gap-2.5 md:grid-cols-2">
             <label class="block">
-              <span class="mb-1.5 block text-sm font-semibold text-slate-700">Provider</span>
-              <select v-model="form.provider" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200">
+              <span class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300">{{ t.provider }}</span>
+              <select v-model="form.provider" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-100 dark:focus:border-teal-500 dark:focus:ring-teal-900">
                 <option value="deepseek">DeepSeek</option>
                 <option value="openai">OpenAI</option>
                 <option value="minimax">MiniMax</option>
@@ -169,94 +235,92 @@
               </select>
             </label>
             <label class="block">
-              <span class="mb-1.5 block text-sm font-semibold text-slate-700">Model</span>
-              <input v-model="form.model" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200" placeholder="留空则使用默认模型">
+              <span class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300">{{ t.model }}</span>
+              <input v-model="form.model" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-teal-500 dark:focus:ring-teal-900" :placeholder="t.modelPlaceholder">
             </label>
             <label class="block md:col-span-2">
-              <span class="mb-1.5 block text-sm font-semibold text-slate-700">标题</span>
-              <input v-model="form.title" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200" placeholder="AI 助力的 Markdown 内容生成与发布工具">
+              <span class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300">{{ t.title }}</span>
+              <input v-model="form.title" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-teal-500 dark:focus:ring-teal-900" :placeholder="t.titlePlaceholder">
             </label>
             <label class="block">
-              <span class="mb-1.5 block text-sm font-semibold text-slate-700">封面图</span>
-              <input v-model="form.image" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200" placeholder="https://example.com/cover.png">
+              <span class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300">{{ t.coverImage }}</span>
+              <input v-model="form.image" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-teal-500 dark:focus:ring-teal-900" placeholder="https://example.com/cover.png">
             </label>
             <label class="block">
-              <span class="mb-1.5 block text-sm font-semibold text-slate-700">分类</span>
-              <input v-model="form.category" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200">
+              <span class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300">{{ t.category }}</span>
+              <input v-model="form.category" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-teal-500 dark:focus:ring-teal-900">
             </label>
             <label class="block">
-              <span class="mb-1.5 block text-sm font-semibold text-slate-700">标签</span>
-              <input v-model="form.tags" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200" placeholder="ai, markdown, publishing">
+              <span class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300">{{ t.tags }}</span>
+              <input v-model="form.tags" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-teal-500 dark:focus:ring-teal-900" :placeholder="t.tagsPlaceholder">
             </label>
             <label class="block">
-              <span class="mb-1.5 block text-sm font-semibold text-slate-700">关键词 / 描述线索</span>
-              <input v-model="form.keywords" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200">
+              <span class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300">{{ t.keywords }}</span>
+              <input v-model="form.keywords" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-teal-500 dark:focus:ring-teal-900">
             </label>
             <label class="block">
-              <span class="mb-1.5 block text-sm font-semibold text-slate-700">目标长度</span>
-              <input v-model="form.targetLength" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200" placeholder="1200-1800 words">
+              <span class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300">{{ t.targetLength }}</span>
+              <input v-model="form.targetLength" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2.5 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-teal-500 dark:focus:ring-teal-900" :placeholder="t.targetLengthPlaceholder">
             </label>
           </div>
           <label class="flex flex-1 flex-col">
-            <span class="mb-1.5 block text-sm font-semibold text-slate-700">草稿 / 写作指令</span>
-            <textarea v-model="form.draft" class="h-0 min-h-[100px] flex-1 w-full resize-none rounded-2xl border border-slate-300 bg-white/80 px-4 py-3 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200" placeholder="写清核心观点、结构要求、是否需要 Mermaid / 引用 / 示例。"></textarea>
+            <span class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300">{{ t.draft }}</span>
+            <textarea v-model="form.draft" class="h-0 min-h-[100px] flex-1 w-full resize-none rounded-2xl border border-slate-300 bg-white/80 px-4 py-3 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-teal-500 dark:focus:ring-teal-900" :placeholder="t.draftPlaceholder"></textarea>
           </label>
           </div>
 
           <button
             @click="handleGenerate"
             :disabled="loading.generate"
-            class="mt-4 w-full rounded-2xl bg-slate-900 px-4 py-4 text-base font-bold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+            class="mt-4 w-full rounded-2xl bg-slate-900 px-4 py-4 text-base font-bold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-700 dark:hover:bg-slate-600"
           >
-            {{ loading.generate ? '正在生成...' : '生成 Markdown' }}
+            {{ loading.generate ? t.generating : t.generateMarkdown }}
           </button>
         </div>
 
         <div class="glass flex h-full flex-col rounded-[2rem] p-6 sm:p-8">
           <div class="mb-5 flex items-center justify-between gap-4">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Review & Publish</p>
-              <h2 class="mt-2 text-2xl font-black text-slate-900">编辑与发布</h2>
+              <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">{{ t.reviewPublish }}</p>
+              <h2 class="mt-2 text-2xl font-black text-slate-900 dark:text-slate-100">{{ t.editPublish }}</h2>
             </div>
             <button
               @click="previewMode = true"
-              class="rounded-xl border border-slate-300 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-500 hover:bg-white"
+              class="rounded-xl border border-slate-300 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-500 hover:bg-white dark:border-slate-600 dark:bg-slate-700/70 dark:text-slate-300 dark:hover:border-slate-400 dark:hover:bg-slate-600"
             >
-              全屏预览
+              {{ t.fullPreview }}
             </button>
           </div>
 
           <div class="flex flex-1 flex-col">
           <label class="flex flex-1 flex-col">
-            <span class="mb-2 block text-sm font-semibold text-slate-700">Markdown 内容</span>
-            <textarea v-model="form.markdown" class="h-0 min-h-[160px] flex-1 w-full resize-none rounded-2xl border border-slate-300 bg-white/80 px-4 py-4 font-mono text-sm leading-6 text-slate-900 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200" placeholder="生成结果会出现在这里，你也可以手动编辑。"></textarea>
+            <span class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">{{ t.markdownContent }}</span>
+            <textarea v-model="form.markdown" class="h-0 min-h-[160px] flex-1 w-full resize-none rounded-2xl border border-slate-300 bg-white/80 px-4 py-4 font-mono text-sm leading-6 text-slate-900 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-teal-500 dark:focus:ring-teal-900" :placeholder="t.markdownPlaceholder"></textarea>
           </label>
 
           <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             <label class="block">
-              <span class="mb-2 block text-sm font-semibold text-slate-700">文件路径</span>
-              <input v-model="form.filePath" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-3 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200" placeholder="nested/post-name.md">
-
+              <span class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">{{ t.filePath }}</span>
+              <input v-model="form.filePath" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-3 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-teal-500 dark:focus:ring-teal-900" :placeholder="t.filePathPlaceholder">
             </label>
             <label class="block">
-              <span class="mb-2 block text-sm font-semibold text-slate-700">提交信息</span>
-              <input v-model="form.commitMessage" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-3 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200" placeholder="Add new article">
-              
+              <span class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">{{ t.commitMessage }}</span>
+              <input v-model="form.commitMessage" type="text" class="w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-3 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-200 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-teal-500 dark:focus:ring-teal-900" :placeholder="t.commitMessagePlaceholder">
             </label>
           </div>
 
-          <div class="mt-4 flex flex-wrap items-center gap-5 rounded-2xl border border-slate-200 bg-white/55 px-4 py-4">
-            <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+          <div class="mt-4 flex flex-wrap items-center gap-5 rounded-2xl border border-slate-200 bg-white/55 px-4 py-4 dark:border-slate-700 dark:bg-slate-800/50">
+            <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
               <input v-model="form.syncToGitHub" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
-              <span>同步到 GitHub</span>
+              <span>{{ t.syncGitHub }}</span>
             </label>
-            <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+            <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
               <input v-model="form.syncToGitee" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
-              <span>同步到 Gitee</span>
+              <span>{{ t.syncGitee }}</span>
             </label>
-            <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+            <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
               <input v-model="form.overwrite" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-600">
-              <span>覆盖同名文件</span>
+              <span>{{ t.overwriteFile }}</span>
             </label>
           </div>
           </div>
@@ -266,7 +330,7 @@
             :disabled="loading.publish"
             class="mt-5 w-full rounded-2xl bg-teal-700 px-4 py-4 text-base font-bold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {{ loading.publish ? '正在发布...' : '发布到内容仓库' }}
+            {{ loading.publish ? t.publishing : t.publishToRepo }}
           </button>
 
         </div>
@@ -276,16 +340,16 @@
     <div v-if="previewMode" class="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-sm">
       <div class="mx-auto flex h-full max-w-7xl flex-col px-4 py-4 sm:px-6 lg:px-8">
         <div class="glass flex h-full flex-col rounded-[2rem]">
-          <div class="flex items-center justify-between border-b border-black/5 px-6 py-4">
+          <div class="flex items-center justify-between border-b border-black/5 px-6 py-4 dark:border-white/5">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Preview</p>
-              <h3 class="mt-1 text-xl font-black text-slate-900">沉浸式双栏预览</h3>
+              <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">{{ t.preview }}</p>
+              <h3 class="mt-1 text-xl font-black text-slate-900 dark:text-slate-100">{{ t.immersivePreview }}</h3>
             </div>
             <button
               @click="closePreview"
-              class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+              class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600"
             >
-              关闭
+              {{ t.close }}
             </button>
           </div>
 
@@ -293,9 +357,9 @@
             <textarea
               id="preview-editor"
               v-model="form.markdown"
-              class="min-h-[260px] w-full resize-none border-r border-black/5 bg-white/70 px-6 py-6 font-mono text-sm leading-6 text-slate-900 outline-none"
+              class="min-h-[260px] w-full resize-none border-r border-black/5 bg-white/70 px-6 py-6 font-mono text-sm leading-6 text-slate-900 outline-none dark:border-white/5 dark:bg-slate-800/70 dark:text-slate-100"
             ></textarea>
-            <div id="preview-panel" class="prose-preview overflow-y-auto bg-white px-6 py-6 text-sm leading-7 text-slate-800" v-html="renderedMarkdown"></div>
+            <div id="preview-panel" class="prose-preview overflow-y-auto bg-white px-6 py-6 text-sm leading-7 text-slate-800 dark:bg-slate-900 dark:text-slate-200" v-html="renderedMarkdown"></div>
           </div>
         </div>
       </div>
@@ -305,6 +369,141 @@
   <script>
     const { createApp, computed, nextTick, onMounted, onBeforeUnmount, ref, watch } = Vue;
 
+    const i18n = {
+      zh: {
+        siteTitle: 'AI 写作与发布后台',
+        logout: '退出登录',
+        loginTitle: '进入发布后台',
+        adminPassword: '管理员密码',
+        passwordPlaceholder: '输入 ADMIN_PASSWORD',
+        verifying: '正在验证...',
+        login: '登录',
+        generate: 'Generate',
+        genConfig: '生成配置',
+        provider: 'Provider',
+        model: 'Model',
+        modelPlaceholder: '留空则使用默认模型',
+        title: '标题',
+        titlePlaceholder: 'AI 助力的 Markdown 内容生成与发布工具',
+        coverImage: '封面图',
+        category: '分类',
+        tags: '标签',
+        tagsPlaceholder: 'ai, markdown, publishing',
+        keywords: '关键词 / 描述线索',
+        targetLength: '目标长度',
+        targetLengthPlaceholder: '1200-1800 words',
+        draft: '草稿 / 写作指令',
+        draftPlaceholder: '写清核心观点、结构要求、是否需要 Mermaid / 引用 / 示例。',
+        generating: '正在生成...',
+        generateMarkdown: '生成 Markdown',
+        reviewPublish: 'Review & Publish',
+        editPublish: '编辑与发布',
+        fullPreview: '全屏预览',
+        markdownContent: 'Markdown 内容',
+        markdownPlaceholder: '生成结果会出现在这里，你也可以手动编辑。',
+        filePath: '文件路径',
+        filePathPlaceholder: 'nested/post-name.md',
+        commitMessage: '提交信息',
+        commitMessagePlaceholder: 'Add new article',
+        syncGitHub: '同步到 GitHub',
+        syncGitee: '同步到 Gitee',
+        overwriteFile: '覆盖同名文件',
+        publishing: '正在发布...',
+        publishToRepo: '发布到内容仓库',
+        preview: 'Preview',
+        immersivePreview: '沉浸式双栏预览',
+        close: '关闭',
+        authCheckFailed: '鉴权状态检查失败，请刷新后重试。',
+        configLoadFailed: '默认模型配置加载失败。',
+        enterPassword: '请输入管理员密码。',
+        loginSuccess: '登录成功。',
+        loginFailed: '登录失败。',
+        logoutSuccess: '已退出登录。',
+        logoutFailed: '退出登录失败。',
+        titleRequired: '标题不能为空。',
+        draftRequired: '草稿或写作指令不能为空。',
+        requestingModel: '正在请求模型生成内容...',
+        generateSuccess: '生成完成，请复核后发布。',
+        generateFailed: '生成失败。',
+        filePathRequired: '发布前必须填写文件路径。',
+        markdownRequired: '发布内容不能为空。',
+        selectTarget: '请至少勾选一个发布目标（GitHub 或 Gitee）。',
+        publishingToRepo: '正在发布到仓库...',
+        publishSuccess: '发布成功。',
+        publishFailed: '发布失败。',
+        refreshSuccess: '表单已重置，可以开始新文章。',
+        refreshTooltip: '重置表单',
+        themeTooltip: '切换主题',
+        langTooltip: '切换语言',
+      },
+      en: {
+        siteTitle: 'AI Writing & Publishing Console',
+        logout: 'Logout',
+        loginTitle: 'Admin Console',
+        adminPassword: 'Admin Password',
+        passwordPlaceholder: 'Enter ADMIN_PASSWORD',
+        verifying: 'Verifying...',
+        login: 'Login',
+        generate: 'Generate',
+        genConfig: 'Configuration',
+        provider: 'Provider',
+        model: 'Model',
+        modelPlaceholder: 'Leave empty for default model',
+        title: 'Title',
+        titlePlaceholder: 'AI-Powered Markdown Content Generation Tool',
+        coverImage: 'Cover Image',
+        category: 'Category',
+        tags: 'Tags',
+        tagsPlaceholder: 'ai, markdown, publishing',
+        keywords: 'Keywords / Description',
+        targetLength: 'Target Length',
+        targetLengthPlaceholder: '1200-1800 words',
+        draft: 'Draft / Instructions',
+        draftPlaceholder: 'Specify key points, structure, Mermaid diagrams, citations, or examples needed.',
+        generating: 'Generating...',
+        generateMarkdown: 'Generate Markdown',
+        reviewPublish: 'Review & Publish',
+        editPublish: 'Edit & Publish',
+        fullPreview: 'Full Preview',
+        markdownContent: 'Markdown Content',
+        markdownPlaceholder: 'Generated content appears here. You can also edit manually.',
+        filePath: 'File Path',
+        filePathPlaceholder: 'nested/post-name.md',
+        commitMessage: 'Commit Message',
+        commitMessagePlaceholder: 'Add new article',
+        syncGitHub: 'Sync to GitHub',
+        syncGitee: 'Sync to Gitee',
+        overwriteFile: 'Overwrite existing',
+        publishing: 'Publishing...',
+        publishToRepo: 'Publish to Repository',
+        preview: 'Preview',
+        immersivePreview: 'Immersive Dual-Pane Preview',
+        close: 'Close',
+        authCheckFailed: 'Auth check failed. Please refresh and try again.',
+        configLoadFailed: 'Failed to load default model config.',
+        enterPassword: 'Please enter admin password.',
+        loginSuccess: 'Login successful.',
+        loginFailed: 'Login failed.',
+        logoutSuccess: 'Logged out.',
+        logoutFailed: 'Logout failed.',
+        titleRequired: 'Title is required.',
+        draftRequired: 'Draft or writing instructions are required.',
+        requestingModel: 'Requesting AI model to generate content...',
+        generateSuccess: 'Generation complete. Please review before publishing.',
+        generateFailed: 'Generation failed.',
+        filePathRequired: 'File path is required before publishing.',
+        markdownRequired: 'Content cannot be empty.',
+        selectTarget: 'Please select at least one target (GitHub or Gitee).',
+        publishingToRepo: 'Publishing to repository...',
+        publishSuccess: 'Published successfully.',
+        publishFailed: 'Publishing failed.',
+        refreshSuccess: 'Form reset. Ready for a new article.',
+        refreshTooltip: 'Reset form',
+        themeTooltip: 'Toggle theme',
+        langTooltip: 'Toggle language',
+      },
+    };
+
     function escapeHtml(raw) {
       return String(raw || '')
         .replace(/&/g, '&amp;')
@@ -312,6 +511,60 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+    }
+
+    /**
+     * Shield math expressions from marked processing.
+     * marked treats `\` as a markdown escape and strips it, which destroys
+     * LaTeX commands like \frac, \sum, and delimiters like \[...\], \(...\).
+     * We extract all math blocks first, let marked process the rest,
+     * then restore them.
+     */
+    function shieldMath(markdown) {
+      const store = [];
+      let idx = 0;
+      const hold = (match) => {
+        const key = `MATHPH${idx++}ENDPH`;
+        store.push({ key, raw: match });
+        return key;
+      };
+
+      let text = markdown;
+
+      // 1. Protect fenced code blocks from false-positive math extraction
+      const codeStore = [];
+      let ci = 0;
+      text = text.replace(/(```+)[\s\S]*?\1/g, (m) => {
+        const ck = `CODEPH${ci++}ENDPH`;
+        codeStore.push({ key: ck, raw: m });
+        return ck;
+      });
+      text = text.replace(/`[^`\n]+`/g, (m) => {
+        const ck = `CODEPH${ci++}ENDPH`;
+        codeStore.push({ key: ck, raw: m });
+        return ck;
+      });
+
+      // 2. Extract math (order matters: display before inline)
+      text = text.replace(/\$\$([\s\S]+?)\$\$/g, hold);
+      text = text.replace(/\\\[([\s\S]+?)\\\]/g, hold);
+      text = text.replace(/\\\((.+?)\\\)/g, hold);
+      text = text.replace(/(?<!\$)\$(?!\$)([^\n$]+?)\$(?!\$)/g, hold);
+
+      // 3. Restore code blocks (let marked handle them normally)
+      for (const { key, raw } of codeStore) {
+        text = text.replace(key, raw);
+      }
+
+      return { text, store };
+    }
+
+    function unshieldMath(html, store) {
+      let result = html;
+      for (const { key, raw } of store) {
+        result = result.replace(key, escapeHtml(raw));
+      }
+      return result;
     }
 
     marked.setOptions({
@@ -329,6 +582,12 @@
         const loading = ref({ auth: false, generate: false, publish: false });
         const status = ref({ message: '', type: 'info' });
         const providerDefaults = ref({});
+
+        const theme = ref(localStorage.getItem('post-admin-theme') || 'light');
+        const lang = ref(localStorage.getItem('post-admin-lang') || 'zh');
+
+        const t = computed(() => i18n[lang.value] || i18n.zh);
+
         const form = ref({
           provider: 'deepseek',
           model: '',
@@ -361,9 +620,47 @@
         };
 
         const renderedMarkdown = computed(() => {
-          const safeMarkdown = escapeHtml(form.value.markdown);
-          return marked.parse(safeMarkdown);
+          const raw = form.value.markdown || '';
+          const { text, store } = shieldMath(raw);
+          const html = marked.parse(escapeHtml(text));
+          return unshieldMath(html, store);
         });
+
+        function applyTheme(value) {
+          const root = document.documentElement;
+          if (value === 'dark') {
+            root.classList.add('dark');
+          } else {
+            root.classList.remove('dark');
+          }
+          localStorage.setItem('post-admin-theme', value);
+        }
+
+        function applyLang(value) {
+          document.documentElement.lang = value === 'zh' ? 'zh-CN' : 'en';
+          localStorage.setItem('post-admin-lang', value);
+        }
+
+        function toggleTheme() {
+          theme.value = theme.value === 'dark' ? 'light' : 'dark';
+        }
+
+        function toggleLang() {
+          lang.value = lang.value === 'zh' ? 'en' : 'zh';
+        }
+
+        function handleRefresh() {
+          form.value.title = '';
+          form.value.image = '';
+          form.value.category = '';
+          form.value.tags = '';
+          form.value.keywords = '';
+          form.value.draft = '';
+          form.value.markdown = '';
+          form.value.filePath = '';
+          form.value.commitMessage = '';
+          showStatus(t.value.refreshSuccess, 'success');
+        }
 
         function clearStatus() {
           status.value = { message: '', type: 'info' };
@@ -459,7 +756,7 @@
             const { data } = await axios.get('/api/check-auth/');
             isLoggedIn.value = Boolean(data.authenticated);
           } catch (error) {
-            showStatus('鉴权状态检查失败，请刷新后重试。', 'error', true);
+            showStatus(t.value.authCheckFailed, 'error', true);
           }
         }
 
@@ -469,13 +766,13 @@
             providerDefaults.value = data.providers || {};
             applyProviderDefault(form.value.provider, true);
           } catch (error) {
-            showStatus('默认模型配置加载失败。', 'error', true);
+            showStatus(t.value.configLoadFailed, 'error', true);
           }
         }
 
         async function handleLogin() {
           if (!loginPassword.value) {
-            showStatus('请输入管理员密码。', 'error', true);
+            showStatus(t.value.enterPassword, 'error', true);
             return;
           }
 
@@ -484,9 +781,9 @@
             await axios.post('/api/login/', { password: loginPassword.value });
             loginPassword.value = '';
             isLoggedIn.value = true;
-            showStatus('登录成功。', 'success');
+            showStatus(t.value.loginSuccess, 'success');
           } catch (error) {
-            showStatus(error.response?.data?.error || '登录失败。', 'error', true);
+            showStatus(error.response?.data?.error || t.value.loginFailed, 'error', true);
           } finally {
             loading.value.auth = false;
           }
@@ -496,34 +793,34 @@
           try {
             await axios.post('/api/logout/');
             isLoggedIn.value = false;
-            showStatus('已退出登录。', 'success');
+            showStatus(t.value.logoutSuccess, 'success');
           } catch (error) {
-            showStatus(error.response?.data?.error || '退出登录失败。', 'error', true);
+            showStatus(error.response?.data?.error || t.value.logoutFailed, 'error', true);
           }
         }
 
         async function handleGenerate() {
           if (!form.value.title.trim()) {
-            showStatus('标题不能为空。', 'error', true);
+            showStatus(t.value.titleRequired, 'error', true);
             return;
           }
 
           if (!form.value.draft.trim()) {
-            showStatus('草稿或写作指令不能为空。', 'error', true);
+            showStatus(t.value.draftRequired, 'error', true);
             return;
           }
 
           loading.value.generate = true;
-          showStatus('正在请求模型生成内容...', 'info');
+          showStatus(t.value.requestingModel, 'info');
           try {
             const { data } = await axios.post('/api/generate/', { ...form.value });
             form.value.markdown = data.markdown || '';
             if (data.suggestedFilePath && !form.value.filePath) {
               form.value.filePath = data.suggestedFilePath;
             }
-            showStatus('生成完成，请复核后发布。', 'success');
+            showStatus(t.value.generateSuccess, 'success');
           } catch (error) {
-            showStatus(error.response?.data?.error || '生成失败。', 'error', true);
+            showStatus(error.response?.data?.error || t.value.generateFailed, 'error', true);
           } finally {
             loading.value.generate = false;
           }
@@ -531,32 +828,40 @@
 
         async function handlePublish() {
           if (!form.value.filePath.trim()) {
-            showStatus('发布前必须填写文件路径。', 'error', true);
+            showStatus(t.value.filePathRequired, 'error', true);
             return;
           }
 
           if (!form.value.markdown.trim()) {
-            showStatus('发布内容不能为空。', 'error', true);
+            showStatus(t.value.markdownRequired, 'error', true);
             return;
           }
 
           if (!form.value.syncToGitHub && !form.value.syncToGitee) {
-            showStatus('请至少勾选一个发布目标（GitHub 或 Gitee）。', 'error', true);
+            showStatus(t.value.selectTarget, 'error', true);
             return;
           }
 
           loading.value.publish = true;
-          showStatus('正在发布到仓库...', 'info');
+          showStatus(t.value.publishingToRepo, 'info');
           try {
             const { data } = await axios.post('/api/publish/', { ...form.value });
             const links = [data.urls?.github, data.urls?.gitee].filter(Boolean).join(' | ');
-            showStatus(`发布成功。${links ? ` ${links}` : ''}`, 'success', false, links ? 8000 : 5000);
+            showStatus(`${t.value.publishSuccess}${links ? ` ${links}` : ''}`, 'success', false, links ? 8000 : 5000);
           } catch (error) {
-            showStatus(error.response?.data?.error || '发布失败。', 'error', true);
+            showStatus(error.response?.data?.error || t.value.publishFailed, 'error', true);
           } finally {
             loading.value.publish = false;
           }
         }
+
+        watch(theme, (value) => {
+          applyTheme(value);
+        });
+
+        watch(lang, (value) => {
+          applyLang(value);
+        });
 
         watch(() => form.value.markdown, () => {
           renderMath();
@@ -579,6 +884,8 @@
         });
 
         onMounted(async () => {
+          applyTheme(theme.value);
+          applyLang(lang.value);
           await loadPublicConfig();
           await checkAuth();
           await renderMath();
@@ -599,9 +906,15 @@
           status,
           providerDefaults,
           form,
+          theme,
+          lang,
+          t,
           renderedMarkdown,
           clearStatus,
           closePreview,
+          toggleTheme,
+          toggleLang,
+          handleRefresh,
           handleLogin,
           handleLogout,
           handleGenerate,
